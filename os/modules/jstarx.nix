@@ -202,10 +202,36 @@ in
   security.rtkit.enable = true;
 
   # ------------------------------------------------------------------ power + 24/7 reliability
-  # Memory: 4 GB RAM + 4 GB swap file on the SD card / SSD = 8 GB usable. Idle app memory is moved
-  # out of RAM early: first into compressed RAM (zram, fastest), then into the swap file.
+  # Memory: 4 GB RAM + a swap file of up to 8 GB on the SD card / SSD (12 GB usable). Idle app memory
+  # is moved out of RAM early: first into compressed RAM (zram, fastest), then into the swap file.
   zramSwap = { enable = true; memoryPercent = 50; algorithm = "zstd"; priority = 100; };
-  swapDevices = [ { device = "/var/lib/jstarx-swapfile"; size = 4096; priority = 10; } ];
+  systemd.services.jstarx-swap = {
+    description = "JStarx swap file (up to 8 GB, sized to fit the SD card)";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    path = with pkgs; [ util-linux coreutils ];
+    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+    script = ''
+      f=/var/lib/jstarx-swapfile
+      disk=$(df --output=size -B1M / | tail -n 1)
+      want=$(( disk / 4 ))                    # a quarter of the card…
+      [ "$want" -gt 8192 ] && want=8192       # …and at most 8 GB
+      [ "$want" -lt 512 ] && exit 0
+      have=0
+      [ -f "$f" ] && have=$(( $(stat -c %s "$f") / 1048576 ))
+      if [ "$have" -ne "$want" ]; then
+        swapoff "$f" 2>/dev/null || true
+        free=$(( $(df --output=avail -B1M / | tail -n 1) + have ))
+        [ "$free" -gt $(( want + 2048 )) ] || want=$(( free - 2048 ))   # always keep 2 GB free
+        [ "$want" -ge 512 ] || exit 0
+        truncate -s 0 "$f" 2>/dev/null || true
+        fallocate -l "''${want}M" "$f"
+        chmod 600 "$f"
+        mkswap "$f" > /dev/null
+      fi
+      swapon -p 10 "$f" 2>/dev/null || true
+    '';
+  };
   boot.kernel.sysctl = {
     "vm.swappiness" = 150;              # swap idle app memory out aggressively (0-200)
     "vm.watermark_scale_factor" = 125;  # start freeing memory before it runs out

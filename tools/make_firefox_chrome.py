@@ -12,16 +12,20 @@ CX = W / 2
 path = (f"M0 0H{W}V{B}"
         f"A{RO} {RO} 0 0 0 {CX + HW} {B + RO}V{D - RB}A{RB} {RB} 0 0 1 {CX + HW - RB} {D}"
         f"H{CX - HW + RB}A{RB} {RB} 0 0 1 {CX - HW} {D - RB}V{B + RO}A{RO} {RO} 0 0 0 0 {B}Z")
+# the thin glass edge along the curve (same direction as the fill path, reversed)
+edge = (f"M0 {B + 0.5}A{RO} {RO} 0 0 1 {CX - HW} {B + RO}V{D - RB}A{RB} {RB} 0 0 0 {CX - HW + RB} {D - 0.5}"
+        f"H{CX + HW - RB}A{RB} {RB} 0 0 0 {CX + HW} {D - RB}V{B + RO}A{RO} {RO} 0 0 1 {W} {B + 0.5}")
 svg = (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:g}" height="58"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="58" '
        f'gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2E0D5C"/><stop offset="1" stop-color="#1A053D"/></linearGradient></defs>'
-       f'<path d="{path}" fill="url(#g)"/></svg>')
+       f'<path d="{path}" fill="url(#g)"/><path d="{edge}" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/></svg>')
 uri = "data:image/svg+xml," + urllib.parse.quote(svg)
 css = f"""/* JStarx: Firefox's top bar curves around the Dynamic Island (made by tools/make_firefox_chrome.py). */
 #navigator-toolbox {{
   background:
     url("{uri}") top center / {W:g}px 58px no-repeat,
+    linear-gradient(rgba(255,255,255,.14), rgba(255,255,255,.14)) left {B}px / 100% 1px no-repeat,
     linear-gradient(180deg, #2E0D5C 0, #200747 {B}px) top left / 100% {B}px no-repeat,
-    #1C0642 !important;
+    #150530 !important;
   border-bottom: none !important;
   color: #F6F0FF !important;
 }}
@@ -29,7 +33,7 @@ css = f"""/* JStarx: Firefox's top bar curves around the Dynamic Island (made by
 #TabsToolbar {{ min-height: {B}px !important; max-height: {B}px !important; background: transparent !important; }}
 #TabsToolbar .toolbar-items {{ max-width: calc(50vw - {HW + RO + 14:g}px) !important; }}
 /* the toolbar with the address bar sits below the curve */
-#nav-bar {{ margin-top: {D - B + 1}px !important; background: transparent !important; box-shadow: none !important; }}
+#nav-bar {{ margin-top: {D - B + 1}px !important; background: #150530 !important; box-shadow: none !important; border-top: none !important; }}
 #PersonalToolbar {{ background: transparent !important; }}
 """
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "layer", "assets", "firefox", "userChrome.css")

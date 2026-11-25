@@ -216,11 +216,11 @@
       S.call('display.get').then(v => disp = v).catch(() => { }),
     ]);
     const cast = Shell.status.cast || {};
-    const profileNames = { saver: 'Power saver', balanced: 'Balanced', performance: 'Performance' };
+    const profileNames = { low: 'Low power', saver: 'Power saver', balanced: 'Balanced', performance: 'Performance', extreme: 'Extreme' };
     const tiles = [
       { id: 'wifi', icon: net.wifi_on === false ? 'wifiOff' : 'wifi', t: 'Wi-Fi', st: net.ssid || (net.wifi_on === false ? 'Off' : 'Not connected'), on: net.wifi_on !== false },
       { id: 'dnd', icon: s.island && s.island.dnd ? 'bellOff' : 'bell', t: 'Do Not Disturb', st: s.island && s.island.dnd ? 'On' : 'Off', on: !!(s.island && s.island.dnd) },
-      { id: 'power', icon: power.profile === 'saver' ? 'leaf' : power.profile === 'performance' ? 'bolt' : 'gauge', t: 'Power mode', st: profileNames[power.profile] || 'Balanced', on: true },
+      { id: 'power', icon: (power.profile === 'saver' || power.profile === 'low') ? 'leaf' : (power.profile === 'performance' || power.profile === 'extreme') ? 'bolt' : 'gauge', t: 'Power mode', st: profileNames[power.profile] || 'Balanced', on: true },
       { id: 'ai247', icon: 'chip', t: 'AI 24/7', st: power.ai_247 ? 'Always on' : 'Off', on: !!power.ai_247 },
       { id: 'cast', icon: 'display', t: 'Cast screen', st: cast.state === 'casting' ? (cast.device || 'Casting') : (disp.casting ? 'To a TV or display' : 'Not available'), on: cast.state === 'casting' },
       { id: 'spark', icon: 'sparkle', t: 'Ask Spark', st: 'Your assistant', on: false },
@@ -244,7 +244,7 @@
     try {
       if (id === 'wifi') { await S.call('net.wifi_radio', { on: net.wifi_on === false }); }
       else if (id === 'dnd') { S.applySettings(await S.call('settings.set', { path: 'island.dnd', value: !(S.settings.island && S.settings.island.dnd) })); }
-      else if (id === 'power') { const order = ['saver', 'balanced', 'performance']; const next = order[(order.indexOf(power.profile || 'balanced') + 1) % 3]; await S.call('power.set', { profile: next }); }
+      else if (id === 'power') { const order = ['low', 'saver', 'balanced', 'performance', 'extreme']; const next = order[(order.indexOf(power.profile || 'balanced') + 1) % order.length]; await S.call('power.set', { profile: next }); }
       else if (id === 'ai247') { await S.call('power.ai247', { on: !power.ai_247 }); }
       else if (id === 'cast') { await S.call('display.cast'); close(); return; }
       else if (id === 'spark') { open('spark'); return; }

@@ -159,7 +159,7 @@ class AppHost:
         hw = self.island_w / 2.0 + 16  # half width of the bay: island + room around it
         cx = W / 2.0                   # a full-screen window is centred under the island
         ro, rb = 12.0, 20.0            # fillet into the bar, rounded bay bottom
-        cr.set_source_rgb(0.11, 0.024, 0.26)  # beside the bay: the colour of the page underneath
+        cr.set_source_rgb(0.082, 0.020, 0.188)  # beside the bay: darker, so the curve stands out
         cr.rectangle(0, B, W, H - B)
         cr.fill()
         cr.move_to(0, 0)

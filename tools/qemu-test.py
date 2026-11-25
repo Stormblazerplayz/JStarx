@@ -318,6 +318,20 @@ def main():
     sys.exit(0 if ok else 1)
 
 
+def snapshot_resources(vm, rep, out):
+    """How much JStarx uses once the desktop is up and idle (RAM, swap, disk, CPU load)."""
+    vm.sh("sleep 90", 200)
+    _, res = vm.sh("free -m; echo; swapon --show; echo; df -h /; echo; cat /proc/loadavg; echo; "
+                   "ps -eo rss,pcpu,comm --sort=-rss | head -16", 300)
+    with open(os.path.join(out, "resources.txt"), "w") as f:
+        f.write(res + "\n")
+    mem = next((l.split() for l in res.splitlines() if l.startswith("Mem:")), None)
+    detail = f"RAM used {mem[2]} MB of {mem[1]} MB (available {mem[6]} MB)" if mem and len(mem) >= 7 else res[:120]
+    rep.check("Resource use measured", mem is not None, detail)
+    rep.check("Swap file is on", "jstarx-swapfile" in res and "zram" in res,
+              " ".join(l.split()[0] + " " + l.split()[2] for l in res.splitlines() if "swap" in l.lower() and "/" in l))
+
+
 def run_no_display_tests(vm, rep, args):
     """No screen plugged in: the desktop runs on a virtual screen and StarCast looks for a TV."""
     t0 = time.time()
@@ -355,6 +369,7 @@ def run_tests(vm, rep, args):
     if args.repair_only:
         vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
         rep.check("StarShell desktop started", True)
+        snapshot_resources(vm, rep, args.out)
         return run_repair_tests(vm, rep, args)
     # ---------------------------------------------------------------- 2. system
     _, kernel = vm.sh("uname -r; cat /proc/version")

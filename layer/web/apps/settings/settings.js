@@ -34,7 +34,7 @@
     { id: 'apps', name: 'Apps', icon: 'apps', color: 'orange', render: pageApps, keys: 'installed uninstall store' },
     { id: 'updates', name: 'Updates', icon: 'refresh', color: 'blue', render: pageUpdates, keys: 'update github version rollback' },
     { id: 'repair', name: 'Repair & Recovery', icon: 'shield', color: 'green', render: pageRepair, keys: 'fix broken reset recovery safe' },
-    { id: 'memory', name: 'Memory', icon: 'memory', color: 'orange', render: pageMemory, keys: 'ram swap zram memory free 8gb' },
+    { id: 'memory', name: 'Memory', icon: 'memory', color: 'orange', render: pageMemory, keys: 'ram swap zram memory free 8gb 12gb' },
     { id: 'storage', name: 'Storage', icon: 'disk', color: 'gray', render: pageStorage, keys: 'disk space clean' },
     { id: 'users', name: 'Users & Privacy', icon: 'user', color: 'teal', render: pageUsers, keys: 'name login ssh password' },
     { id: 'time', name: 'Date & Time', icon: 'clock', color: 'gray', render: pageTime, keys: 'timezone clock 24' },
@@ -116,10 +116,14 @@
     const st = await call('system.stats') || {};
     const prof = p.profile || 'balanced';
     const modes = [
-      { v: 'saver', t: 'Power saver', s: '2 CPU cores, low speed. Coolest and quietest.', icon: 'leaf' },
+      { v: 'low', t: 'Low power', s: '1 CPU core, lowest speed. Uses the least power and heat.', icon: 'leaf' },
+      { v: 'saver', t: 'Power saver', s: '2 CPU cores, low speed. Cool and quiet.', icon: 'leaf' },
       { v: 'balanced', t: 'Balanced', s: 'All cores, speed adapts to the work. Best for most things.', icon: 'gauge' },
-      { v: 'performance', t: 'Performance', s: 'All cores at full speed. For games and AI training.', icon: 'bolt' }];
-    return card('Power mode', `<div class="choice" style="--n:3">${modes.map(o => `<button class="${prof === o.v ? 'on' : ''}" data-power="1" data-v="${o.v}"><div class="ct">${S.icon(o.icon)}${o.t}</div><div class="cs">${o.s}</div></button>`).join('')}</div>`) +
+      { v: 'performance', t: 'Performance', s: 'All cores at full speed. For games and AI training.', icon: 'bolt' },
+      { v: 'extreme', t: 'Extreme', s: 'Everything locked at full speed, fan at max. Fastest, hottest. Use a good power supply.', icon: 'bolt' }];
+    return card('Power mode', `<div class="choice" style="--n:5">${modes.map(o => `<button class="${prof === o.v ? 'on' : ''}" data-power="1" data-v="${o.v}"><div class="ct">${S.icon(o.icon)}${o.t}</div><div class="cs">${o.s}</div></button>`).join('')}</div>`) +
+      (p.has_fan !== false ? card('Fan', item('Fan speed', 'Auto: the fan speeds up when the Jetson gets warm. Max: always full speed (best for 24/7 AI). Extreme mode always uses Max.',
+        `<button class="btn small ${p.fan !== 'max' ? 'primary' : ''}" data-fan="auto">Auto</button><button class="btn small ${p.fan === 'max' ? 'primary' : ''}" data-fan="max">Max</button>`)) : '') +
       card('24/7 AI mode', item('Keep AI running all the time', 'Never sleeps, restarts AI jobs after power cuts, turns the screen off when idle, and uses the watchdog so a freeze reboots the Jetson.',
         `<button class="toggle" role="switch" aria-checked="${!!p.ai_247}" id="ai247"></button>`)) +
       card('Screen', item('Dim the screen after', '0 = never', slider('power.dim_min', 0, 60, 1, ' min')) + item('Turn the screen off after', '0 = never', slider('power.screen_off_min', 0, 120, 1, ' min'))) +
@@ -267,6 +271,7 @@
     }
     if (t.dataset.choice) { const v = t.dataset.choice === 'appearance.bounce' ? +t.dataset.v : t.dataset.v; await setSetting(t.dataset.choice, v); return render(true); }
     if (t.dataset.power) { await call('power.set', { profile: t.dataset.v }, 'Power mode changed'); return render(true); }
+    if (t.dataset.fan) { await call('power.fan', { mode: t.dataset.fan }, 'Fan updated'); return render(true); }
     if (t.dataset.pin) { const list = get('dock.pinned').slice(); const i = list.indexOf(t.dataset.pin); i >= 0 ? list.splice(i, 1) : list.push(t.dataset.pin); await setSetting('dock.pinned', list); return render(true); }
     if (t.dataset.join) { const pw = main.querySelector(`[data-pw="${CSS.escape(t.dataset.join)}"]`); t.textContent = 'Joining…'; const r = await call('net.wifi_connect', { ssid: t.dataset.join, password: pw ? pw.value : null }); S.toast(r && r.ok ? 'Connected!' : 'Could not connect. Check the password.'); return render(true); }
     if (t.dataset.uninstall) { await call('store.uninstall', { id: t.dataset.uninstall }, 'Uninstalled'); return render(true); }

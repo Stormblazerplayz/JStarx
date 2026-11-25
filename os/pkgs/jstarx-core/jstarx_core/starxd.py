@@ -134,9 +134,18 @@ def op_memory_saver(on=None):
 
 
 def memory_saver_loop():
-    """Every 15 s: when less than 35% of RAM is free, push idle app memory to swap (aggressive)."""
+    """Every 15 s: when less than 35% of RAM is free, push idle app memory to swap (aggressive).
+    Every 5 s: keep the fan at full speed if Extreme / fan Max is on."""
+    tick = 0
     while True:
-        time.sleep(15)
+        time.sleep(5)
+        try:
+            power.keep_fan()
+        except Exception:
+            pass
+        tick += 1
+        if tick % 3:
+            continue
         try:
             if flag("no-memory-saver"):
                 continue
@@ -196,6 +205,7 @@ OPS = {
     "ping": lambda: {"pong": True, "time": time.time()},
     "power_get": power.get,
     "power_set": lambda profile: power.set_profile(profile),
+    "fan_set": lambda mode: {"fan": power.fan(mode)},
     "ai247_set": lambda on: power.set_ai247(on),
     "update_check": updater.check,
     "update_apply": op_update_apply,

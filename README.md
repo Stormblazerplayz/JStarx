@@ -25,7 +25,7 @@ animations, and it is built to run AI 24/7.
 | **Auto repair** | Fixes damaged files at every start, undoes an update if the desktop keeps crashing, Safe Mode, and goes back to the last working system if a new one can't start |
 | **Wireless display** | Cast the screen to a Miracast TV or a Chromecast; with no screen plugged in, JStarx finds a wireless display by itself |
 | **Full-screen apps** | Apps open full screen; JStarx apps' title bars curve around the Dynamic Island, and hovering the island opens it |
-| **8 GB memory** | 4 GB RAM + a 4 GB swap file; idle app memory moves to compressed RAM, then to the swap file, so RAM stays free |
+| **Up to 12 GB memory** | 4 GB RAM + a swap file of up to 8 GB (a quarter of the card: 32 GB cards get the full 8 GB); idle app memory moves to compressed RAM, then to the swap file, so RAM stays free. Settings → Memory and the island's Memory tab show it |
 | **Power saving** | Power modes (Saver / Balanced / Performance), screen dimming and screen off, CPU limits, compressed memory (zram) |
 
 No bloatware: the system only has what JStarx needs. Everything else is in the Star Store.

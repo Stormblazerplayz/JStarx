@@ -47,9 +47,12 @@
     const hw = compactWidth() / 2 + 16;
     const p = `M0 0H${W}V${B}H${cx + hw + ro}A${ro} ${ro} 0 0 0 ${cx + hw} ${B + ro}V${D - rb}A${rb} ${rb} 0 0 1 ${cx + hw - rb} ${D}` +
       `H${cx - hw + rb}A${rb} ${rb} 0 0 1 ${cx - hw} ${D - rb}V${B + ro}A${ro} ${ro} 0 0 0 ${cx - hw - ro} ${B}H0Z`;
+    // the thin glass edge: along the bottom of the bar and around the bay (as apps and Firefox draw it)
+    const e = `M0 ${B + 0.5}H${cx - hw - ro}A${ro} ${ro} 0 0 1 ${cx - hw} ${B + ro}V${D - rb}A${rb} ${rb} 0 0 0 ${cx - hw + rb} ${D - 0.5}` +
+      `H${cx + hw - rb}A${rb} ${rb} 0 0 0 ${cx + hw} ${D - rb}V${B + ro}A${ro} ${ro} 0 0 1 ${cx + hw + ro} ${B + 0.5}H${W}`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${innerHeight}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="58" gradientUnits="userSpaceOnUse">` +
       `<stop offset="0" stop-color="#2E0D5C"/><stop offset="1" stop-color="#1A053D"/></linearGradient></defs>` +
-      `<rect width="100%" height="100%" fill="#1C0642"/><path d="${p}" fill="url(#g)"/></svg>`;
+      `<rect width="100%" height="100%" fill="#150530"/><path d="${p}" fill="url(#g)"/><path d="${e}" fill="none" stroke="rgba(255,255,255,0.14)"/></svg>`;
     document.body.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     document.body.style.backgroundSize = 'auto'; document.body.style.backgroundPosition = '0 0';
   }
@@ -81,7 +84,8 @@
     const st = Shell.status;
     if (st.cast && st.cast.state === 'casting') icons.push(S.icon('display'));
     if (power.profile === 'saver') icons.push(S.icon('leaf'));
-    else if (power.profile === 'performance') icons.push(S.icon('bolt'));
+    else if (power.profile === 'low') icons.push(S.icon('leaf'));
+    else if (power.profile === 'performance' || power.profile === 'extreme') icons.push(S.icon('bolt'));
     if (S.settings.island && S.settings.island.dnd) icons.push(S.icon('bellOff'));
     const wired = (net.devices || []).some(d => d.type === 'ethernet' && String(d.state).startsWith('connected'));
     if (wired) icons.push(S.icon('ethernet'));
@@ -165,7 +169,7 @@
     const now = new Date();
     const wired = (net.devices || []).some(d => d.type === 'ethernet' && String(d.state).startsWith('connected'));
     const ai = (st.ai && st.ai.jobs || []).filter(j => j.state === 'running');
-    const prof = { saver: 'Battery saver', balanced: 'Balanced', performance: 'Performance' }[power.profile] || 'Balanced';
+    const prof = { low: 'Low power', saver: 'Power saver', balanced: 'Balanced', performance: 'Performance', extreme: 'Extreme' }[power.profile] || 'Balanced';
     return `<div><div class="pbig">${S.esc(S.time(now))}</div>
         <div class="pdate">${S.esc(now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))}</div></div>
       <div class="prow"><span>${S.icon(wired ? 'ethernet' : (net.ssid ? 'wifi' : 'wifiOff'))}${S.esc(wired ? 'Ethernet' : (net.ssid || 'Not connected'))}</span>

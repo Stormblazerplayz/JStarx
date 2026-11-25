@@ -134,6 +134,9 @@ class Api:
     def m_power_set(self, profile, view=None):
         return daemon.starxd("power_set", profile=profile)
 
+    def m_power_fan(self, mode, view=None):
+        return daemon.starxd("fan_set", mode="max" if mode == "max" else "auto")
+
     @threaded
     def m_power_ai247(self, on, view=None):
         return daemon.starxd("ai247_set", on=bool(on))

@@ -376,3 +376,41 @@ def test_system_update_refuses_bad_description(sysroot, monkeypatch):
     monkeypatch.setattr(sysupdate, "_get", lambda url, timeout=30: b'{"system": "/nix/store/../../etc/evil"}')
     with pytest.raises(RuntimeError):
         sysupdate.apply()
+
+
+def test_low_and_extreme_power_and_fan(tmp_path, monkeypatch, sysroot):
+    sysfs = tmp_path / "sys"
+    for n in range(4):
+        cpu = sysfs / f"devices/system/cpu/cpu{n}"
+        (cpu / "cpuidle/state1").mkdir(parents=True)
+        (cpu / "cpuidle/state1/disable").write_text("0")
+        if n:
+            (cpu / "online").write_text("1")
+    pol = sysfs / "devices/system/cpu/cpufreq/policy0"
+    pol.mkdir(parents=True)
+    for k, v in {"scaling_available_governors": "powersave conservative schedutil performance", "scaling_governor": "schedutil",
+                 "cpuinfo_min_freq": "100000", "cpuinfo_max_freq": "1500000", "scaling_max_freq": "1500000", "scaling_min_freq": "100000"}.items():
+        (pol / k).write_text(v)
+    fan = sysfs / "class/thermal/cooling_device0"
+    fan.mkdir(parents=True)
+    for k, v in {"type": "pwm-fan", "max_state": "3", "cur_state": "0"}.items():
+        (fan / k).write_text(v)
+    monkeypatch.setenv("JSTARX_SYSFS", str(sysfs))
+    power = fresh("jstarx_core.power")
+    power.apply("low")
+    assert (sysfs / "devices/system/cpu/cpu1/online").read_text() == "0"
+    assert int((pol / "scaling_max_freq").read_text()) == 100000 + int(1400000 * 0.4)
+    power.set_profile("extreme")
+    assert all((sysfs / f"devices/system/cpu/cpu{n}/online").read_text() == "1" for n in range(1, 4))
+    assert (pol / "scaling_governor").read_text() == "performance"
+    assert (pol / "scaling_min_freq").read_text() == "1500000"  # locked at full speed
+    assert (sysfs / "devices/system/cpu/cpu2/cpuidle/state1/disable").read_text() == "1"
+    assert (fan / "cur_state").read_text() == "3"  # fan at full speed
+    (fan / "cur_state").write_text("1")  # the kernel lowers it when cool…
+    assert power.keep_fan() and (fan / "cur_state").read_text() == "3"  # …and JStarx puts it back
+    power.set_profile("balanced")
+    assert power.fan("auto") == "auto" and not power.keep_fan()
+    power.fan("max")
+    assert power.keep_fan() and power.get()["fan"] == "max"
+    power.fan("auto")
+    assert (sysfs / "devices/system/cpu/cpu2/cpuidle/state1/disable").read_text() == "0"
