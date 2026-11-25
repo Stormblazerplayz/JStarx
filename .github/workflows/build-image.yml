@@ -72,8 +72,24 @@ jobs:
           done < closure.txt
           echo "$(wc -l < ours.txt) JStarx paths, $(wc -l < deps.txt) from cache.nixos.org"
           mkdir syscache
-          xargs nix --extra-experimental-features nix-command copy --no-recursive --no-check-sigs \
-            --to "file://$PWD/syscache?compression=zstd" < ours.txt
+          # Nix writes a path into a cache only when everything it refers to is in that cache already,
+          # so copy the whole system first, then remove what cache.nixos.org has (the Jetson gets it there)
+          nix --extra-experimental-features nix-command copy --no-check-sigs \
+            --to "file://$PWD/syscache?compression=zstd" "$sys"
+          # two paths with the same contents share one file: keep every file that one of ours uses
+          while read -r p; do
+            h=$(basename "$p" | cut -c1-32)
+            sed -n 's/^URL: //p' "syscache/$h.narinfo"
+          done < ours.txt | sort -u > keep-files.txt
+          while read -r p; do
+            h=$(basename "$p" | cut -c1-32)
+            url=$(sed -n 's/^URL: //p' "syscache/$h.narinfo" 2>/dev/null || true)
+            rm -f "syscache/$h.narinfo"
+            if [ -n "$url" ] && ! grep -qxF "$url" keep-files.txt; then rm -f "syscache/$url"; fi
+          done < deps.txt
+          # every path we keep must have its file, or the Jetson could not install the update
+          for n in syscache/*.narinfo; do test -f "syscache/$(sed -n 's/^URL: //p' "$n")"; done
+          echo "$(ls syscache/*.narinfo | wc -l) JStarx paths in the update cache"
           printf 'StoreDir: /nix/store\nWantMassQuery: 0\nPriority: 30\n' > syscache/nix-cache-info
           tar -C syscache -cf - . | zstd -T0 -10 > out/system-cache.tar.zst
           jq -n --arg system "$sys" --arg version "$(jq -r .version layer/layer.json)" --rawfile deps deps.txt \
