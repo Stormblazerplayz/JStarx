@@ -3,6 +3,7 @@
 Run with:  python3 -m starx.app <app-id>
 Each app is its own process and its own single-instance GTK application.
 """
+import json
 import os
 import signal
 import sys
@@ -11,7 +12,7 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
-from gi.repository import GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
 
 from . import apps, paths  # noqa: E402
 from .api import Api, _notify_shell  # noqa: E402
@@ -24,10 +25,12 @@ CSS = b"""
 window.starx-app { background: #140430; }
 window.starx-app decoration { border-radius: 14px 14px 0 0;
   box-shadow: 0 18px 50px rgba(8,0,24,.65), 0 0 0 1px rgba(255,255,255,.14); }
-window.starx-app headerbar { background-image: linear-gradient(180deg, #2B0B57, #1B063D); background-color: #1B063D;
-  border: none; box-shadow: inset 0 -1px rgba(255,255,255,.08), inset 0 1px rgba(255,255,255,.12);
-  color: #F6F0FF; min-height: 40px; padding: 0 8px; border-radius: 14px 14px 0 0; }
-window.starx-app headerbar .title { font-weight: 700; color: #F6F0FF; font-family: Inter, sans-serif; }
+window.starx-app headerbar { background: none; background-image: none; border: none; box-shadow: none;
+  color: #F6F0FF; min-height: 40px; padding: 0 10px; border-radius: 14px 14px 0 0; }
+window.starx-app.maximized headerbar { min-height: 58px; padding-bottom: 18px; border-radius: 0; }
+window.starx-app.maximized decoration { border-radius: 0; }
+window.starx-app headerbar .title, window.starx-app headerbar .starx-title { font-weight: 700; color: #F6F0FF; font-family: Inter, sans-serif; }
+window.starx-app headerbar .starx-sub { color: rgba(246,240,255,.6); font-family: Inter, sans-serif; margin-left: 8px; }
 window.starx-app headerbar .subtitle { color: rgba(246,240,255,.6); }
 window.starx-app headerbar button.titlebutton { background: rgba(255,255,255,.10); border-radius: 99px; min-width: 22px;
   min-height: 22px; margin: 0 3px; padding: 2px; color: #F6F0FF; border: none; box-shadow: none; -gtk-icon-shadow: none; }
@@ -50,7 +53,7 @@ class AppApi(Api):
         return True
 
     def m_window_title(self, title, view=None):
-        self.host.header.set_subtitle(str(title)[:80])
+        self.host.sub_label.set_text(str(title)[:80])
         return True
 
     def m_window_fullscreen(self, on=None, view=None):
@@ -79,16 +82,33 @@ class AppHost:
         Gtk.StyleContext.add_provider_for_screen(Gtk.Window().get_screen(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         win = Gtk.ApplicationWindow(application=app)
+        self.win = win
         win.get_style_context().add_class("starx-app")
         w, h = SIZES.get(rec["id"], (1000, 720))
         win.set_default_size(w, h)
-        header = Gtk.HeaderBar(title=rec["name"], show_close_button=True)
+        header = Gtk.HeaderBar(show_close_button=True)
         header.set_decoration_layout("icon:minimize,maximize,close")
         icon = self._icon_pixbuf(rec, 128)
         if icon:
             win.set_icon(icon)  # shown at the left of the title bar ("icon" in the decoration layout)
+        # Title on the left, buttons on the right: the middle belongs to the Dynamic Island, and when
+        # the app is full screen the bar curves down around it (drawn in _draw_header).
+        win.set_title(rec["name"])
+        self.title_label = Gtk.Label(label=rec["name"], xalign=0)
+        self.title_label.get_style_context().add_class("starx-title")
+        self.sub_label = Gtk.Label(label="", xalign=0)
+        self.sub_label.get_style_context().add_class("starx-sub")
+        header.pack_start(self.title_label)
+        header.pack_start(self.sub_label)
+        header.set_custom_title(Gtk.Box())
+        header.connect("draw", self._draw_header)
+        win.connect("window-state-event", lambda *a: header.queue_draw())
         win.set_titlebar(header)
         self.header = header
+        self.island_w = 236
+        os.makedirs(paths.RUNTIME, exist_ok=True)
+        self._island_watch = FileWatch(paths.RUNTIME, ["island.json"], self._island_changed)
+        self._island_changed()
 
         page = os.path.relpath(rec["entry"], paths.WEB) if rec["entry"].startswith(paths.WEB) else None
         ctx = {"surface": "app", "app": {k: v for k, v in rec.items() if k != "exec"}, "role": "app"}
@@ -102,6 +122,65 @@ class AppHost:
         self.win = win
         self.view = view
         self._watch = FileWatch(paths.CONFIG, ["settings.json"], self._settings_changed)
+
+    def _island_changed(self):
+        try:
+            with open(os.path.join(paths.RUNTIME, "island.json")) as f:
+                w = int(json.load(f).get("w") or 236)
+        except (OSError, ValueError, TypeError, AttributeError):
+            return
+        if 120 <= w <= 600 and w != self.island_w:
+            self.island_w = w
+            self.header.queue_draw()
+
+    def _draw_header(self, widget, cr):
+        """The title bar: a glass bar, and when full screen a smooth bay around the Dynamic Island."""
+        import math
+        import cairo
+        alloc = widget.get_allocation()
+        W, H = float(alloc.width), float(alloc.height)
+        maximized = bool(self.win.get_window() and self.win.get_window().get_state() & Gdk.WindowState.MAXIMIZED)
+        bar = cairo.LinearGradient(0, 0, 0, H)
+        bar.add_color_stop_rgb(0, 0.18, 0.05, 0.36)
+        bar.add_color_stop_rgb(1, 0.10, 0.02, 0.24)
+        if not maximized:
+            r = 14.0
+            cr.new_sub_path()
+            cr.arc(r, r, r, math.pi, 1.5 * math.pi)
+            cr.arc(W - r, r, r, 1.5 * math.pi, 2 * math.pi)
+            cr.line_to(W, H)
+            cr.line_to(0, H)
+            cr.close_path()
+            cr.set_source(bar)
+            cr.fill()
+            return False
+        B = 40.0                       # the bar; buttons and title sit in it
+        D = H - 1.0                    # how deep the bay goes
+        hw = self.island_w / 2.0 + 16  # half width of the bay: island + room around it
+        cx = W / 2.0                   # a full-screen window is centred under the island
+        ro, rb = 12.0, 20.0            # fillet into the bar, rounded bay bottom
+        cr.set_source_rgb(0.11, 0.024, 0.26)  # beside the bay: the colour of the page underneath
+        cr.rectangle(0, B, W, H - B)
+        cr.fill()
+        cr.move_to(0, 0)
+        cr.line_to(W, 0)
+        cr.line_to(W, B)
+        cr.line_to(cx + hw + ro, B)
+        cr.arc_negative(cx + hw + ro, B + ro, ro, 1.5 * math.pi, math.pi)
+        cr.line_to(cx + hw, D - rb)
+        cr.arc(cx + hw - rb, D - rb, rb, 0, 0.5 * math.pi)
+        cr.line_to(cx - hw + rb, D)
+        cr.arc(cx - hw + rb, D - rb, rb, 0.5 * math.pi, math.pi)
+        cr.line_to(cx - hw, B + ro)
+        cr.arc_negative(cx - hw - ro, B + ro, ro, 0, -0.5 * math.pi)
+        cr.line_to(0, B)
+        cr.close_path()
+        cr.set_source(bar)
+        cr.fill_preserve()
+        cr.set_source_rgba(1, 1, 1, 0.10)  # a thin glass edge along the curve
+        cr.set_line_width(1)
+        cr.stroke()
+        return False  # GTK draws the title and buttons on top
 
     @staticmethod
     def _icon_pixbuf(rec, size):

@@ -3,14 +3,14 @@ border.width: 1
 padding.height: 6
 titlebar.height: 32
 window.titlebar.padding.width: 8
-window.titlebar.padding.height: 0
+window.titlebar.padding.height: 16
 window.active.border.color: #4A2390
 window.inactive.border.color: #2A1350
 window.active.title.bg.color: #2B0B57
 window.inactive.title.bg.color: #1B063D
 window.active.label.text.color: #F6F0FF
 window.inactive.label.text.color: #A08CC8
-window.label.text.justify: center
+window.label.text.justify: left
 window.active.button.unpressed.image.color: #F6F0FF
 window.inactive.button.unpressed.image.color: #8D7AB8
 window.active.button.hover.image.color: #FF9F43

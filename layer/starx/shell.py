@@ -2,6 +2,7 @@
 control center, Spark). Run with:  python3 -m starx.shell
 """
 import json
+import math
 import os
 import shutil
 import signal
@@ -30,6 +31,7 @@ from .notify import NotificationServer  # noqa: E402
 
 Edge, Layer, KB = GtkLayerShell.Edge, GtkLayerShell.Layer, GtkLayerShell.KeyboardMode
 ISLAND_W, ISLAND_H = 620, 52
+ISLAND_PILL = ((ISLAND_W - 236) / 2, 8, 236, 38, 19)  # the compact island inside its surface (x, y, w, h, radius)
 
 
 def _read_json(path):
@@ -41,9 +43,19 @@ def _read_json(path):
 
 
 class Surface:
-    def __init__(self, shell, name, page, layer, anchors, size=None, exclusive=0, keyboard=KB.NONE, margins=None, visible=True):
+    def __init__(self, shell, name, page, layer, anchors, size=None, exclusive=0, keyboard=KB.NONE, margins=None, visible=True,
+                 shape=None):
         self.shell, self.name = shell, name
         win = Gtk.Window(title=f"starx-{name}")
+        # A shaped surface (the island) is see-through except for one rounded rectangle. The page
+        # itself stays opaque (WebKit is unreliable when see-through); it is clipped to the shape.
+        # The see-through visual has to be chosen before the window becomes a layer surface.
+        self.shape = None
+        visual = win.get_screen().get_rgba_visual() if shape else None
+        if shape and visual is not None and cairo is not None:
+            win.set_visual(visual)
+            win.set_app_paintable(True)  # nothing painted outside the page, so it stays see-through
+            self.shape = shape
         GtkLayerShell.init_for_window(win)
         GtkLayerShell.set_namespace(win, f"starx-{name}")
         GtkLayerShell.set_layer(win, layer)
@@ -62,6 +74,9 @@ class Surface:
         win.add(self.view)
         self.win = win
         self.size = size
+        if self.shape:
+            self.view.connect("draw", self._clip_view)
+            win.connect("realize", lambda *a: self._apply_shape_input())
         win.connect("map-event", lambda *a: self.repaint())
         win.connect("size-allocate", self._on_alloc)
         self.anchors = anchors
@@ -78,6 +93,30 @@ class Surface:
         if geo != self.geometry:
             self.geometry = geo
             self.shell.bridge.emit("geometry", geo, [self.view])
+
+    def _clip_view(self, view, cr):
+        """Runs before the page is painted: only the island's rounded shape gets painted."""
+        x, y, w, h, r = self.shape
+        r = max(0.0, min(float(r), w / 2, h / 2))
+        cr.new_sub_path()
+        cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+        cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+        cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+        cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+        cr.close_path()
+        cr.clip()
+        return False
+
+    def set_shape(self, x, y, w, h, r):
+        shape = (float(x), float(y), max(1.0, float(w)), max(1.0, float(h)), float(r))
+        self.set_input([{"x": shape[0], "y": shape[1], "w": shape[2], "h": shape[3]}])  # clicks next to it reach the app
+        if self.shape is not None and shape != self.shape:
+            self.shape = shape
+            self.win.queue_draw()
+
+    def _apply_shape_input(self):
+        x, y, w, h, _r = self.shape
+        self.set_input([{"x": x, "y": y, "w": w, "h": h}])  # clicks around the shape reach the app below
 
     def repaint(self):
         from .bridge import run_js
@@ -121,6 +160,14 @@ class ShellApi(Api):
         s = self.shell.surfaces.get(surface)
         if s:
             s.set_input(rects)
+        return True
+
+    def m_shell_shape(self, surface, x, y, w, h, r=0, view=None):
+        s = self.shell.surfaces.get(surface)
+        if s:
+            s.set_shape(x, y, w, h, r)
+            if surface == "island":
+                self.shell.island_moved(x, y, w, h, r)
         return True
 
     def m_shell_size(self, surface, w, h, exclusive=None, view=None):
@@ -211,8 +258,9 @@ class Shell:
                                exclusive=-1, keyboard=KB.ON_DEMAND),
             "dock": Surface(self, "dock", "shell/dock.html", Layer.TOP, [Edge.BOTTOM], size=(min(W, 900), dock_h),
                             exclusive=dock_h, keyboard=KB.NONE),
+            # the island floats over full-screen apps: it reserves no space, and apps curve around it
             "island": Surface(self, "island", "shell/island.html", Layer.TOP, [Edge.TOP], size=(ISLAND_W, ISLAND_H),
-                              exclusive=ISLAND_H, keyboard=KB.NONE),
+                              exclusive=0, keyboard=KB.NONE),
             "overlay": Surface(self, "overlay", "shell/overlay.html", Layer.OVERLAY, [Edge.TOP, Edge.BOTTOM, Edge.LEFT, Edge.RIGHT],
                                exclusive=-1, keyboard=KB.EXCLUSIVE, visible=False),
         }
@@ -382,6 +430,21 @@ class Shell:
         GLib.timeout_add(500, fast)
 
     # ---------------------------------------------------------------- health (used by auto-repair)
+    def island_moved(self, x, y, w, h, r):
+        """Tell app windows where the compact island is, so their title bars can curve around it."""
+        if h > 48:  # expanded (notification, volume…): apps keep the compact shape
+            return
+        shape = {"x": round((self.screen["width"] - ISLAND_W) / 2 + float(x)), "y": round(float(y)),
+                 "w": round(float(w)), "h": round(float(h))}
+        if shape == getattr(self, "_island_shape", None):
+            return
+        self._island_shape = shape
+        try:
+            from .settings import atomic_write_json
+            atomic_write_json(os.path.join(paths.RUNTIME, "island.json"), shape)
+        except OSError:
+            pass
+
     def surface_ready(self, view):
         self.ready_views.add(id(view))
         ov = getattr(self, "surfaces", {}).get("overlay")

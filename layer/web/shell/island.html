@@ -10,7 +10,8 @@
   #island { position: absolute; top: 8px; left: 0; right: 0; margin: 0 auto; height: 38px; width: 236px;
     border-radius: 22px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 10px; overflow: hidden;
     transition: width .55s var(--spring), height .55s var(--spring), border-radius .5s var(--spring), transform .35s var(--spring);
-    background-color: rgba(16, 2, 36, .78); cursor: pointer; }
+    background: linear-gradient(180deg, #170826, #07020E); box-shadow: inset 0 0 0 1px rgba(255,255,255,.09), inset 0 1px rgba(255,255,255,.12);
+    cursor: pointer; }
   #island:hover { transform: scale(1.035); }
   #island:active { transform: scale(.97); }
   #island .logo { width: 20px; height: 20px; flex: none; }
@@ -27,6 +28,13 @@
   #compact.off { opacity: 0; transform: scale(.9); position: absolute; }
   /* notification card */
   #note { padding: 14px 16px; align-items: flex-start; gap: 14px; }
+  /* hover: the island opens with today's details */
+  #peek { padding: 12px 18px; gap: 16px; }
+  #peek .pbig { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  #peek .pdate { font-size: 12.5px; color: var(--text-2); margin-top: 5px; white-space: nowrap; }
+  #peek .prow { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-left: auto; }
+  #peek .prow span { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  #peek .prow .ico { width: 15px; height: 15px; color: var(--o-200); }
   #note .nicon { width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center; color: #fff;
     background: var(--accent-grad); }
   #note .nicon .ico { width: 24px; height: 24px; }
@@ -40,7 +48,7 @@
 </style>
 </head>
 <body>
-<div id="island" class="glass" role="button" aria-label="Dynamic island: open Control Center">
+<div id="island" role="button" aria-label="Dynamic island: open Control Center">
   <div id="compact" class="mode on">
     <img class="logo" id="logo" alt="">
     <span class="time" id="time">--:--</span>
@@ -49,6 +57,7 @@
   </div>
   <div id="note" class="mode"></div>
   <div id="osd" class="mode"></div>
+  <div id="peek" class="mode"></div>
 </div>
 <script src="../common/starx.js"></script>
 <script src="common.js"></script>

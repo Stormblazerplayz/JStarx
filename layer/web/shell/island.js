@@ -15,21 +15,58 @@
     island.style.width = w + 'px'; island.style.height = h + 'px';
     island.style.borderRadius = Math.min(h / 2, 30) + 'px';
   }
-  function surface(big) {
-    const s = big ? BIG : SMALL;
-    S.send('shell.size', { surface: 'island', w: s.w, h: s.h, exclusive: SMALL.h });
+  function surface(big, w, h) {
+    const s = w ? { w: Math.min(BIG.w, w + 20), h: Math.min(BIG.h, h + 18) } : (big ? BIG : SMALL);
+    // exclusive 0: the island floats over full-screen apps instead of pushing them down
+    S.send('shell.size', { surface: 'island', w: s.w, h: s.h, exclusive: 0 });
+    watchShape(900);
   }
-  function input() { /* opaque surface: no input region needed */ }
-  let geo = null;
+  /* The surface is see-through around the pill: tell the shell the pill's exact shape (it follows
+     every frame of the bouncy morphs), so apps show around it and clicks next to it reach them. */
+  let lastShape = '', shapeUntil = 0, shapeLoop = false;
+  function reportShape() {
+    const r = island.getBoundingClientRect();
+    const scale = island.offsetWidth ? r.width / island.offsetWidth : 1;
+    const rad = (parseFloat(getComputedStyle(island).borderTopLeftRadius) || 0) * scale;
+    const sh = { surface: 'island', x: Math.floor(r.left), y: Math.floor(r.top), w: Math.ceil(r.width), h: Math.ceil(r.height), r: Math.round(rad * 10) / 10 };
+    const key = [sh.x, sh.y, sh.w, sh.h, sh.r].join(',');
+    if (key !== lastShape) { lastShape = key; S.send('shell.shape', sh); }
+  }
+  function watchShape(ms) {
+    shapeUntil = Math.max(shapeUntil, performance.now() + (ms || 600));
+    if (shapeLoop) return;
+    shapeLoop = true;
+    const tick = () => { reportShape(); if (performance.now() < shapeUntil) requestAnimationFrame(tick); else { shapeLoop = false; reportShape(); } };
+    requestAnimationFrame(tick);
+  }
+  /* What is behind the island: the wallpaper on the desktop, or the app's curved title bar when an
+     app is full screen (the same bar + bay JStarx apps draw), so the island blends into either. */
+  let geo = null, overApp = false, bayW = 0;
+  function bayBackground() {
+    const W = innerWidth, cx = W / 2, B = 40, D = 57, ro = 12, rb = 20;
+    const hw = compactWidth() / 2 + 16;
+    const p = `M0 0H${W}V${B}H${cx + hw + ro}A${ro} ${ro} 0 0 0 ${cx + hw} ${B + ro}V${D - rb}A${rb} ${rb} 0 0 1 ${cx + hw - rb} ${D}` +
+      `H${cx - hw + rb}A${rb} ${rb} 0 0 1 ${cx - hw} ${D - rb}V${B + ro}A${ro} ${ro} 0 0 0 ${cx - hw - ro} ${B}H0Z`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${innerHeight}"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="58" gradientUnits="userSpaceOnUse">` +
+      `<stop offset="0" stop-color="#2E0D5C"/><stop offset="1" stop-color="#1A053D"/></linearGradient></defs>` +
+      `<rect width="100%" height="100%" fill="#1C0642"/><path d="${p}" fill="url(#g)"/></svg>`;
+    document.body.style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    document.body.style.backgroundSize = 'auto'; document.body.style.backgroundPosition = '0 0';
+  }
   function alignGlass() {
-    const scr = S.ctx.screen || { width: innerWidth };
-    const ox = geo ? geo.x : (scr.width - innerWidth) / 2, oy = geo ? geo.y : 0;
-    S.wallBehind(ox, oy);
-    S.alignGlass(island, ox, oy);
+    if (overApp) { bayBackground(); }
+    else {
+      const scr = S.ctx.screen || { width: innerWidth };
+      S.wallBehind(geo ? geo.x : (scr.width - innerWidth) / 2, geo ? geo.y : 0);
+    }
+    watchShape(300);
   }
+  function input() { watchShape(300); }
+  S.on('windows', wins => { const o = (wins || []).length > 0; if (o !== overApp) { overApp = o; alignGlass(); S.repaint(); } });
   S.on('geometry', g => { geo = g; alignGlass(); S.repaint(); });
-  window.addEventListener('resize', alignGlass);
-  island.addEventListener('transitionend', e => { if (e.propertyName === 'width' || e.propertyName === 'height') { input(); alignGlass(); } });
+  window.addEventListener('resize', () => watchShape(600));
+  ['transitionrun', 'transitionend', 'mouseenter', 'mouseleave', 'mousedown', 'mouseup'].forEach(ev => island.addEventListener(ev, () => watchShape(700)));
+  new MutationObserver(() => watchShape(700)).observe(island, { childList: true, subtree: true, characterData: true, attributes: true });
 
   /* ---------- compact content ---------- */
   function compactWidth() {
@@ -78,7 +115,7 @@
   function show(which, ms) {
     clearTimeout(modeTimer);
     mode = which;
-    ['compact', 'note', 'osd'].forEach(m => $('#' + m).classList.toggle('on', m === which));
+    ['compact', 'note', 'osd', 'peek'].forEach(m => $('#' + m).classList.toggle('on', m === which));
     $('#compact').classList.toggle('off', which !== 'compact');
     if (which === 'compact') {
       setSize(compactWidth(), 38);
@@ -91,7 +128,7 @@
 
   function showNote(n) {
     if (mode === 'note') { queue.push(n); return; }
-    surface(true);
+    surface(true, 500, 92);
     const ic = n.icon && S.iconNames.includes(n.icon) ? n.icon : (n.icon === 'jstarx' ? 'star' : 'bell');
     $('#note').innerHTML = `<div class="nicon">${S.icon(ic)}</div><div class="grow"><div class="napp">${S.esc(n.app)}</div>
       <div class="nsum">${S.esc(n.summary)}</div><div class="nbody">${S.esc(n.body)}</div></div>`;
@@ -110,7 +147,34 @@
     show('osd', 1600);
   }
 
+  /* ---------- hover: the island opens by itself, and closes when the pointer leaves ---------- */
+  let peekTimer = null;
+  function showPeek() {
+    if (mode !== 'compact') return;
+    const st = Shell.status || {};
+    const now = new Date();
+    const wired = (net.devices || []).some(d => d.type === 'ethernet' && String(d.state).startsWith('connected'));
+    const ai = (st.ai && st.ai.jobs || []).filter(j => j.state === 'running');
+    const prof = { saver: 'Battery saver', balanced: 'Balanced', performance: 'Performance' }[power.profile] || 'Balanced';
+    $('#peek').innerHTML = `<div><div class="pbig">${S.esc(S.time(now))}</div>
+        <div class="pdate">${S.esc(now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))}</div></div>
+      <div class="prow"><span>${S.icon(wired ? 'ethernet' : (net.ssid ? 'wifi' : 'wifiOff'))}${S.esc(wired ? 'Ethernet' : (net.ssid || 'Not connected'))}</span>
+        <span>${S.icon('bolt')}${S.esc(prof)}</span>
+        <span>${S.icon('chip')}${ai.length ? `${ai.length} AI job${ai.length > 1 ? 's' : ''} running` : 'AI ready'}</span></div>`;
+    surface(true, 440, 96);  // the surface hugs the open card, so little of the app is covered
+    setTimeout(() => { setSize(440, 96); show('peek'); }, 30);
+  }
+  island.addEventListener('mouseenter', () => {
+    clearTimeout(peekTimer);
+    if (mode === 'compact') peekTimer = setTimeout(showPeek, 260);
+  });
+  island.addEventListener('mouseleave', () => {
+    clearTimeout(peekTimer);
+    if (mode === 'peek') peekTimer = setTimeout(() => { if (mode === 'peek') show('compact'); }, 320);
+  });
+
   island.addEventListener('click', () => {
+    clearTimeout(peekTimer);
     if (mode === 'note') {
       S.send('notifications.dismiss', { id: $('#note')._id });
       show('compact'); return;

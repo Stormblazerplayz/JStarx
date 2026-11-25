@@ -276,7 +276,10 @@ def pick_boot_screen(out):
         px = list(im.get_flattened_data() if hasattr(im, "get_flattened_data") else im.getdata())
         purple = sum(1 for r, g, b in px if b > 60 and r > 40 and g < r and b > g + 20)
         orange = sum(1 for r, g, b in px if r > 200 and 90 < g < 200 and b < 90)
-        score = purple + 30 * orange
+        centre = im.crop((67, 25, 93, 50))  # where the logo lands
+        cp = list(centre.get_flattened_data() if hasattr(centre, "get_flattened_data") else centre.getdata())
+        logo = sum(1 for r, g, b in cp if r > 150 and (g > 90 or b > 150))
+        score = purple + 30 * orange + 40 * logo if purple > 1500 else purple
         if score > best_score:
             best, best_score = name, score
     if best:

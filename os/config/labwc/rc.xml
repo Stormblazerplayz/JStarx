@@ -3,7 +3,7 @@
 <labwc_config>
   <core>
     <decoration>server</decoration>
-    <gap>6</gap>
+    <gap>0</gap>
     <reuseOutputMode>yes</reuseOutputMode>
   </core>
   <theme>
@@ -41,6 +41,12 @@
   <mouse>
     <default />
   </mouse>
+  <windowRules>
+    <!-- Apps open full screen, from the top edge to the dock; the Dynamic Island floats over them -->
+    <windowRule identifier="*" type="normal">
+      <action name="Maximize" />
+    </windowRule>
+  </windowRules>
   <libinput>
     <device category="default"><tap>yes</tap><naturalScroll>no</naturalScroll></device>
   </libinput>

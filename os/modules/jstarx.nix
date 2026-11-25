@@ -175,7 +175,7 @@ in
       "widget.use-xdg-desktop-portal.file-picker" = 1;
       "ui.systemUsesDarkTheme" = 1;
       "browser.theme.toolbar-theme" = 0;
-      "browser.tabs.inTitlebar" = 1;
+      "browser.tabs.inTitlebar" = 0;   # JStarx title bar: the Dynamic Island sits in it
       "media.ffmpeg.vaapi.enabled" = false;
     };
   };
@@ -201,7 +201,15 @@ in
   security.rtkit.enable = true;
 
   # ------------------------------------------------------------------ power + 24/7 reliability
-  zramSwap = { enable = true; memoryPercent = 50; algorithm = "zstd"; };
+  # Memory: 4 GB RAM + 4 GB swap file on the SD card / SSD = 8 GB usable. Idle app memory is moved
+  # out of RAM early: first into compressed RAM (zram, fastest), then into the swap file.
+  zramSwap = { enable = true; memoryPercent = 50; algorithm = "zstd"; priority = 100; };
+  swapDevices = [ { device = "/var/lib/jstarx-swapfile"; size = 4096; priority = 10; } ];
+  boot.kernel.sysctl = {
+    "vm.swappiness" = 150;              # swap idle app memory out aggressively (0-200)
+    "vm.watermark_scale_factor" = 125;  # start freeing memory before it runs out
+    "vm.page-cluster" = 0;              # zram works best one page at a time
+  };
   systemd.settings.Manager = { RuntimeWatchdogSec = "30s"; RebootWatchdogSec = "2min"; };
   # never stop at a rescue prompt: keep starting, then auto-repair takes over
   systemd.enableEmergencyMode = false;
