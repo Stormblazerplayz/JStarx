@@ -74,6 +74,75 @@ def meminfo():
             "swap_total": vals.get("SwapTotal", 0), "swap_used": max(0, vals.get("SwapTotal", 0) - vals.get("SwapFree", 0))}
 
 
+APP_NAMES = {"firefox": "Firefox", "WebKitWebProcess": "JStarx pages", "WebKitNetworkProcess": "JStarx pages",
+             "llama-server": "Spark 1", "labwc": "Window manager", "foot": "Terminal", "Xwayland": "X11 apps",
+             "pipewire": "Sound", "wireplumber": "Sound", "gimp": "GIMP", "vlc": "VLC", "codium": "VSCodium",
+             "thunar": "Files", "starxd": "JStarx system", "starai": "AI Center"}
+
+
+def _app_name(pid):
+    comm = _read(f"/proc/{pid}/comm")
+    if comm.startswith("python"):
+        cmd = _read(f"/proc/{pid}/cmdline").replace("\0", " ")
+        if "starx.shell" in cmd:
+            return "JStarx desktop"
+        if "starx.app" in cmd:
+            return "JStarx apps"
+        if "starx.starcast" in cmd:
+            return "Wireless display"
+        if "trainer" in cmd or "starai" in cmd:
+            return "AI Center"
+        return "Python"
+    for key, name in APP_NAMES.items():
+        if comm.lower().startswith(key.lower()):
+            return name
+    return comm or "?"
+
+
+def memory_details(top=6):
+    """RAM, compressed RAM (zram), swap file, and which apps use memory (in RAM and in swap)."""
+    m = meminfo()
+    vals = {}
+    for line in _read("/proc/meminfo").splitlines():
+        k, _, v = line.partition(":")
+        if v.split():
+            vals[k] = int(v.split()[0]) * 1024
+    zram = {"total": 0, "used": 0, "stored": 0}
+    swapfile = {"total": 0, "used": 0}
+    for line in _read("/proc/swaps").splitlines()[1:]:
+        f = line.split()
+        if len(f) < 4:
+            continue
+        size, used = int(f[2]) * 1024, int(f[3]) * 1024
+        target = zram if "zram" in f[0] else swapfile
+        target["total"] += size
+        target["used"] += used
+    mm = _read("/sys/block/zram0/mm_stat").split()
+    if len(mm) >= 3:
+        zram["stored"] = int(mm[0])          # app memory kept in zram
+        zram["ram_cost"] = int(mm[2])        # real RAM it takes after compression
+    apps = {}
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        rss = swap = 0
+        for line in _read(f"/proc/{pid}/status").splitlines():
+            if line.startswith("VmRSS:"):
+                rss = int(line.split()[1]) * 1024
+            elif line.startswith("VmSwap:"):
+                swap = int(line.split()[1]) * 1024
+        if not rss and not swap:
+            continue
+        name = _app_name(pid)
+        a = apps.setdefault(name, {"name": name, "ram": 0, "swap": 0})
+        a["ram"] += rss
+        a["swap"] += swap
+    ranked = sorted(apps.values(), key=lambda a: a["ram"] + a["swap"], reverse=True)[:top]
+    return {"ram": {"total": m["total"], "used": m["used"], "available": m["available"], "cache": vals.get("Cached", 0)},
+            "zram": zram, "swapfile": swapfile, "usable": m["total"] + swapfile["total"],
+            "swap_total": m["swap_total"], "swap_used": m["swap_used"], "apps": ranked}
+
+
 def disk(path="/"):
     try:
         st = os.statvfs(path)

@@ -40,22 +40,35 @@ def cfg():
     c.setdefault("port", 8090)
     c.setdefault("auto_download", True)
     c.setdefault("release", DEFAULT_RELEASE)
+    c.setdefault("fast", False)
     return c
 
 
-def set_cfg(threads=None, ctx=None):
+def set_cfg(threads=None, ctx=None, fast=None):
     c = cfg()
     if threads:
         c["threads"] = max(1, min(16, int(threads)))
     if ctx:
         c["ctx"] = max(256, min(32768, int(ctx)))
+    if fast is not None:
+        c["fast"] = bool(fast)
     write_json(CONFIG, c)
     return c
 
 
-def find_model():
+def find_model(fast=None):
+    """The model to run: the smaller 4-bit copy for "Faster answers", else the best quality one."""
     ggufs = sorted(glob.glob(os.path.join(MODELS, "**", "*.gguf"), recursive=True), key=os.path.getsize, reverse=True)
-    return ggufs[0] if ggufs else None
+    ggufs = [g for g in ggufs if not g.endswith(".part")]
+    if not ggufs:
+        return None
+    fast = cfg().get("fast") if fast is None else fast
+    if fast:
+        small = [g for g in ggufs if "q4" in os.path.basename(g).lower()]
+        if small:
+            return small[0]
+    preferred = [g for g in ggufs if "q8_0" in os.path.basename(g).lower()]
+    return preferred[0] if preferred else ggufs[0]
 
 
 def find_checkpoint():

@@ -14,7 +14,7 @@ import subprocess
 import threading
 import time
 
-from . import boot, layers, power, repair, spark, updater
+from . import boot, layers, power, repair, spark, sysupdate, updater
 from .common import STATE, log, read_json, run, status, write_json
 
 SOCKET = os.environ.get("STARXD_SOCKET", "/run/starxd.sock")
@@ -84,6 +84,70 @@ def op_password_set(old, new, _uid=None):
     return {"user": user, "changed": True}
 
 
+# ---------------------------------------------------------------- memory: keep RAM free
+CGROUP_USER = os.environ.get("JSTARX_USER_CGROUP", "/sys/fs/cgroup/user.slice")
+
+
+def _meminfo():
+    vals = {}
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, _, v = line.partition(":")
+                if v.split():
+                    vals[k] = int(v.split()[0]) * 1024
+    except OSError:
+        pass
+    return vals
+
+
+def reclaim(nbytes):
+    """Move up to nbytes of the least-used app memory out of RAM (into compressed RAM / the swap file)."""
+    nbytes = int(max(16 << 20, min(nbytes, 2 << 30)))
+    path = os.path.join(CGROUP_USER, "memory.reclaim")
+    try:
+        with open(path, "w") as f:
+            f.write(str(nbytes))
+        return True
+    except OSError:  # the kernel could not free that much right now (or no cgroup support): fine
+        return False
+
+
+def op_memory_free():
+    before = _meminfo().get("MemAvailable", 0)
+    total = _meminfo().get("MemTotal", 1)
+    target = max(256 << 20, int(total * 0.6) - before)  # aim for 60% of RAM free
+    reclaim(target)
+    try:
+        with open("/proc/sys/vm/compact_memory", "w") as f:
+            f.write("1")
+    except OSError:
+        pass
+    after = _meminfo().get("MemAvailable", 0)
+    return {"freed": max(0, after - before), "available": after, "total": total}
+
+
+def op_memory_saver(on=None):
+    if on is not None:
+        flag("no-memory-saver", not bool(on))
+    return {"on": not flag("no-memory-saver")}
+
+
+def memory_saver_loop():
+    """Every 15 s: when less than 35% of RAM is free, push idle app memory to swap (aggressive)."""
+    while True:
+        time.sleep(15)
+        try:
+            if flag("no-memory-saver"):
+                continue
+            m = _meminfo()
+            total, avail = m.get("MemTotal", 0), m.get("MemAvailable", 0)
+            if total and avail < total * 0.35:
+                reclaim(int(total * 0.40) - avail)
+        except Exception as e:  # never let this stop starxd
+            log("memory saver:", e)
+
+
 def op_storage_clean():
     before = os.statvfs("/")
     run(["nix-collect-garbage", "--delete-older-than", "14d"], timeout=3600)
@@ -96,6 +160,27 @@ def op_storage_clean():
 def op_shell_failed():
     """The session supervisor reports the desktop crashed 3 times."""
     return repair.shell_failed()
+
+
+_sys_lock = threading.Lock()
+
+
+def op_system_update_apply():
+    """Download and install the whole-system update in the background (it can take a while)."""
+    if not _sys_lock.acquire(blocking=False):
+        raise RuntimeError("a system update is already running")
+
+    def work():
+        try:
+            sysupdate.apply()
+        except Exception as e:
+            log("system update failed:", e)
+            status("sysupdate", state="error", message=str(e)[:300])
+        finally:
+            _sys_lock.release()
+
+    threading.Thread(target=work, daemon=True).start()
+    return {"started": True}
 
 
 def op_update_apply():
@@ -123,9 +208,13 @@ OPS = {
     "system_set": op_system_set,
     "spark_download": lambda url=None: spark.download(url or ""),
     "spark_import": lambda path: spark.import_file(path),
-    "spark_service": lambda action, threads=None, ctx=None: (spark.set_cfg(threads, ctx), spark.service(action))[1],
+    "spark_service": lambda action, threads=None, ctx=None, fast=None: (spark.set_cfg(threads, ctx, fast), spark.service(action))[1],
     "boot_info": boot.info,
     "password_set": op_password_set,
+    "memory_free": op_memory_free,
+    "system_update_check": sysupdate.check,
+    "system_update_apply": op_system_update_apply,
+    "memory_saver": op_memory_saver,
 }
 # operations that are told which user is asking (never taken from the request itself)
 NEEDS_UID = {"password_set"}
@@ -190,6 +279,7 @@ def main():
         os.unlink(SOCKET)
     except OSError:
         pass
+    threading.Thread(target=memory_saver_loop, daemon=True).start()
     srv = Server(SOCKET, Handler)
     try:
         os.chown(SOCKET, 0, grp.getgrnam("jstarx").gr_gid)

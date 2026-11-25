@@ -25,6 +25,23 @@ if [ "$connected" = 0 ]; then
   export WLR_HEADLESS_OUTPUTS=1 STARX_HEADLESS=1
 fi
 
+# Firefox: one profile, with the JStarx top bar that curves around the Dynamic Island.
+export MOZ_LEGACY_PROFILES=1
+FFDIR="$HOME/.mozilla/firefox"
+if [ ! -f "$FFDIR/profiles.ini" ]; then
+  mkdir -p "$FFDIR/jstarx.default"
+  printf '[General]\nStartWithLastProfile=1\nVersion=2\n\n[Profile0]\nName=default\nIsRelative=1\nPath=jstarx.default\nDefault=1\n' > "$FFDIR/profiles.ini"
+fi
+FFPROFILE="$(sed -n 's/^Path=//p' "$FFDIR/profiles.ini" | head -n 1)"
+if [ -n "$FFPROFILE" ]; then
+  case "$FFPROFILE" in /*) ;; *) FFPROFILE="$FFDIR/$FFPROFILE" ;; esac
+  mkdir -p "$FFPROFILE/chrome"
+  # keep a userChrome.css the user made themselves; otherwise follow the active JStarx layer
+  if [ ! -e "$FFPROFILE/chrome/userChrome.css" ] || [ -L "$FFPROFILE/chrome/userChrome.css" ]; then
+    ln -sfn /var/lib/jstarx/layers/current/assets/firefox/userChrome.css "$FFPROFILE/chrome/userChrome.css"
+  fi
+fi
+
 mkdir -p "${XDG_RUNTIME_DIR:-/tmp}/jstarx"
 LOG="${XDG_RUNTIME_DIR:-/tmp}/jstarx/session.log"
 # Try the GPU first; if the compositor can't start, fall back to software rendering.

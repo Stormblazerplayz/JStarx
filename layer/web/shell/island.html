@@ -29,7 +29,20 @@
   /* notification card */
   #note { padding: 14px 16px; align-items: flex-start; gap: 14px; }
   /* hover: the island opens with today's details */
-  #peek { padding: 12px 18px; gap: 16px; }
+  #peek { padding: 10px 16px 12px; flex-direction: column; align-items: stretch; gap: 6px; }
+  #peek .ptabs { display: flex; gap: 4px; align-self: flex-end; margin-bottom: -2px; }
+  #peek .ptabs button { all: unset; cursor: pointer; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 99px;
+    color: var(--text-2); background: rgba(255,255,255,.06); transition: background .2s, color .2s; }
+  #peek .ptabs button.on { background: linear-gradient(90deg, #9D4EDD, #FF8A00); color: #fff; }
+  #peek .pbody { display: flex; align-items: center; gap: 16px; }
+  #peek .pmem { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  #peek .pml { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); }
+  #peek .pml span { display: flex; align-items: center; gap: 6px; }
+  #peek .pml b { color: var(--text); }
+  #peek .pml .ico { width: 15px; height: 15px; color: var(--o-200); }
+  #peek .meter { height: 6px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; }
+  #peek .meter i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #9D4EDD, #FF8A00); }
+  #peek .meter.swap i { background: linear-gradient(90deg, #4FD1FF, #9D4EDD); }
   #peek .pbig { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
   #peek .pdate { font-size: 12.5px; color: var(--text-2); margin-top: 5px; white-space: nowrap; }
   #peek .prow { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-left: auto; }

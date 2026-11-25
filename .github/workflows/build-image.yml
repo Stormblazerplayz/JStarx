@@ -1,11 +1,13 @@
-# Builds the JStarx OS SD card image for the Jetson Nano.
-# Runs for pull requests, from the Actions tab ("Run workflow"), or when a tag like v1.0.0 is pushed
-# (then it also publishes a release). Download the image from the run's "Artifacts".
+# Builds the JStarx OS SD card image for the Jetson Nano, and the whole-system update.
+# Runs for pull requests, from the Actions tab ("Run workflow"), for pushes to main (then it also
+# publishes a "system-N" release that Jetsons install as a whole-system update), and for tags like
+# v1.0.0 (then it publishes a release with the SD card image). Download files from the run's "Artifacts".
 name: Build JStarx OS image
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
   pull_request:
     paths: ["os/**", "layer/**", "default.nix", ".github/workflows/build-image.yml"]
@@ -52,15 +54,47 @@ jobs:
           version=$(jq -r .version layer/layer.json)
           mkdir out
           xz -T0 -6 -c result-sd/sd-image/*.img > "out/jstarx-${version}-jetson-nano.img.xz"
+          ls -lh out
+
+      - name: Make the whole-system update
+        run: |
+          sys=$(nix-build -A toplevel --no-out-link)
+          nix-store -qR "$sys" > closure.txt
+          : > ours.txt; : > deps.txt
+          # what cache.nixos.org already has, the Jetson downloads from there; the rest is ours
+          while read -r p; do
+            h=$(basename "$p" | cut -c1-32)
+            if curl -sfI --retry 3 "https://cache.nixos.org/$h.narinfo" >/dev/null; then echo "$p" >> deps.txt; else echo "$p" >> ours.txt; fi
+          done < closure.txt
+          echo "$(wc -l < ours.txt) JStarx paths, $(wc -l < deps.txt) from cache.nixos.org"
+          mkdir syscache
+          xargs nix --extra-experimental-features nix-command copy --no-recursive --no-check-sigs \
+            --to "file://$PWD/syscache?compression=zstd" < ours.txt
+          printf 'StoreDir: /nix/store\nWantMassQuery: 0\nPriority: 30\n' > syscache/nix-cache-info
+          tar -C syscache -cf - . | zstd -T0 -10 > out/system-cache.tar.zst
+          jq -n --arg system "$sys" --arg version "$(jq -r .version layer/layer.json)" --rawfile deps deps.txt \
+            '{system: $system, version: $version, deps: ($deps | split("\n") | map(select(length > 0)))}' > out/system.json
           (cd out && sha256sum * > SHA256SUMS)
           ls -lh out
 
-      - name: Save the image
+      - name: Save the image and the system update
         uses: actions/upload-artifact@v4
         with:
           name: jstarx-sd-image
           path: out/
           compression-level: 0
+
+      - name: Publish the whole-system update
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: system-${{ github.run_number }}
+          name: JStarx system update ${{ github.run_number }}
+          body: Whole-system update for JStarx OS. Jetsons install it from Settings → Updates (or automatically).
+          make_latest: false
+          files: |
+            out/system.json
+            out/system-cache.tar.zst
 
       - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/')

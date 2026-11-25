@@ -36,6 +36,7 @@ DEFAULTS = {
         "model_url": "https://github.com/Stormblazerplayz/JStarx/releases/tag/Spark1",
         "threads": 4,
         "ctx": 2048,
+        "fast": False,
         "personality": "You are Spark 1, the friendly built-in assistant of JStarx OS. Keep answers short and clear.",
     },
     "updates": {"auto": True, "branch": "main", "interval_h": 6},

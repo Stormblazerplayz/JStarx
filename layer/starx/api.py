@@ -197,6 +197,27 @@ class Api:
         return res
 
     @threaded
+    @threaded
+    def m_update_system_check(self, view=None):
+        return daemon.starxd("system_update_check", timeout=60)
+
+    def m_update_system_apply(self, view=None):
+        return daemon.starxd("system_update_apply", timeout=30)
+
+    def m_update_system_status(self, view=None):
+        return daemon.status("sysupdate")
+
+    def m_memory_info(self, view=None):
+        return system.memory_details()
+
+    @threaded
+    def m_memory_free(self, view=None):
+        return daemon.starxd("memory_free", timeout=120)
+
+    @threaded
+    def m_memory_saver(self, on=None, view=None):
+        return daemon.starxd("memory_saver", on=on, timeout=20)
+
     def m_storage_clean(self, view=None):
         return daemon.starxd("storage_clean", timeout=1800)
 
@@ -344,7 +365,7 @@ class Api:
     @threaded
     def m_spark_service(self, action, view=None):
         return daemon.starxd("spark_service", action=action, threads=self.settings.get("spark.threads"),
-                             ctx=self.settings.get("spark.ctx"))
+                             ctx=self.settings.get("spark.ctx"), fast=bool(self.settings.get("spark.fast")))
 
     def m_spark_chat(self, messages, view=None):
         """Stream an answer from Spark 1. Sends 'spark-token' events, then 'spark-done'."""

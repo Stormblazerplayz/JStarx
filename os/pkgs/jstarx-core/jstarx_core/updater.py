@@ -179,10 +179,16 @@ def rollback(reason="You chose to undo the update"):
 
 
 def auto():
-    """Timer entry point: check, and install if allowed."""
+    """Timer entry point: check, and install if allowed (the JStarx layer, then the whole system)."""
     layers.ensure_initialized()
     c = config()
     res = check()
     if c["auto"] and res.get("state") == "available":
-        return apply()
+        res = apply()
+    if c["auto"]:
+        from . import sysupdate
+        try:
+            res = dict(res, system=sysupdate.auto())
+        except Exception as e:
+            log("system update check failed:", e)
     return res

@@ -434,19 +434,20 @@ def run_repair_tests(vm, rep, args):
     rep.check("Auto-repair fixes damaged and missing files", code2 == 0 and "Restored" in fix, " ".join(re.findall(r"Restored [^\"]+", fix))[:200])
 
     # ---------------------------------------------------------------- 6. auto-repair: crashing desktop
-    vm.sh("rm -f /run/greetd.run; systemctl restart greetd")  # greetd only auto-logs in once per boot otherwise
+    # end the desktop session, then let greetd log in again (it only auto-logs in once per boot otherwise)
+    vm.sh("pkill -u storm -f starx-shell-supervisor; pkill -u storm -x labwc; sleep 8; rm -f /run/greetd.run; systemctl restart greetd")
     try:
-        vm.wait_sh("P=$(pgrep -u storm -f 'starx.shell' | head -1) && tr '\\0' '\\n' < /proc/$P/environ | grep -q 'JSTARX_LAYER=/var/lib/jstarx/layers/a'", 1500, every=15)
+        vm.wait_sh("P=$(pgrep -n -u storm -f 'starx.shell') && tr '\\0' '\\n' < /proc/$P/environ | grep -q 'JSTARX_LAYER=/var/lib/jstarx/layers/a'", 1500, every=15)
         on_a = True
     except Timeout:
         on_a = False
     rep.check("Desktop restarts on the updated layer (slot A)", on_a)
     vm.sh("sleep 5; pkill -u storm -x swayidle || true")
     for i in range(3):
-        _, pid = vm.sh("pgrep -u storm -f 'starx.shell' | head -1")
+        _, pid = vm.sh("pgrep -n -u storm -f 'starx.shell'")
         vm.sh("pkill -9 -u storm -f 'starx.shell' || true")
         if i < 2:
-            vm.wait_sh(f"P=$(pgrep -u storm -f 'starx.shell' | head -1) && [ -n \"$P\" ] && [ \"$P\" != '{pid.strip()}' ]", 600, every=3)
+            vm.wait_sh(f"P=$(pgrep -n -u storm -f 'starx.shell') && [ -n \"$P\" ] && [ \"$P\" != '{pid.strip()}' ]", 600, every=3)
     try:
         vm.wait_sh("grep -q 'auto-repair switched' /run/user/1000/jstarx/supervisor.log", 900, every=10)
         switched = True

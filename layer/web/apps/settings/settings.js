@@ -34,6 +34,7 @@
     { id: 'apps', name: 'Apps', icon: 'apps', color: 'orange', render: pageApps, keys: 'installed uninstall store' },
     { id: 'updates', name: 'Updates', icon: 'refresh', color: 'blue', render: pageUpdates, keys: 'update github version rollback' },
     { id: 'repair', name: 'Repair & Recovery', icon: 'shield', color: 'green', render: pageRepair, keys: 'fix broken reset recovery safe' },
+    { id: 'memory', name: 'Memory', icon: 'memory', color: 'orange', render: pageMemory, keys: 'ram swap zram memory free 8gb' },
     { id: 'storage', name: 'Storage', icon: 'disk', color: 'gray', render: pageStorage, keys: 'disk space clean' },
     { id: 'users', name: 'Users & Privacy', icon: 'user', color: 'teal', render: pageUsers, keys: 'name login ssh password' },
     { id: 'time', name: 'Date & Time', icon: 'clock', color: 'gray', render: pageTime, keys: 'timezone clock 24' },
@@ -138,6 +139,7 @@
         `<div class="item"><div class="txt"></div><div class="ctl"><button class="btn primary small" id="spark-dl">${S.icon('download')} Download Spark 1</button></div></div>` +
         item('Or use a file you already have', 'Full path to a .gguf or .pt model file, or its tokenizer.json (for example on a USB stick).', `<input class="field" id="model-path" placeholder="/run/media/storm/USB/sft_best.pt" style="width:320px"><button class="btn small" id="spark-import">Import</button>`)) +
       card('Engine', item('Spark engine', 'llama.cpp running on this Jetson (127.0.0.1:8090).', `<button class="btn small" data-spark="restart">${S.icon('restart')} Restart</button><button class="btn small" data-spark="stop">${S.icon('stop')} Stop</button>`) +
+        item('Faster answers', 'Uses a smaller copy of Spark 1: about twice as fast on the Jetson, a little less smart. (The Jetson\'s GPU needs NVIDIA\'s own old kernel, so Spark runs on the 4 CPU cores.)', toggle('spark.fast')) +
         item('CPU threads', '', slider('spark.threads', 1, 8, 1)) + item('Memory (context length)', 'Longer means Spark remembers more of the chat but uses more RAM.', slider('spark.ctx', 512, 8192, 512, ' tokens'))) +
       card('Personality', `<div style="padding:12px 0"><textarea class="field" id="persona">${esc(get('spark.personality'))}</textarea><div style="margin-top:10px;text-align:right"><button class="btn small" id="persona-save">Save</button></div></div>`) +
       card('', item('AI Center', 'Run models and training jobs 24/7, watch temperatures and progress.', `<button class="btn small" id="open-ai">${S.icon('chip')} Open AI Center</button>`));
@@ -151,6 +153,19 @@
         `<div class="empty">Nothing yet. JStarx keeps things light: get only the apps you want from Star Store.</div><div style="padding-bottom:14px"><button class="btn primary small" id="open-store">${S.icon('bag')} Open Star Store</button></div>`);
   }
 
+  async function systemUpdateCard() {
+    const s = await call('update.system_status') || {};
+    const text = { available: esc(s.message || 'A system update is ready'), downloading: `Downloading… ${s.progress != null ? s.progress + '%' : ''}`,
+      installing: esc(s.message || 'Installing…'), ready: 'Installed: restart the Jetson to finish', 'up-to-date': 'The whole system is up to date',
+      error: `Problem: ${esc(s.message || '')}` }[s.state] || 'Not checked yet';
+    const busy = s.state === 'downloading' || s.state === 'installing';
+    return card('Whole system (StarX Kernel, drivers, apps)', item(s.version ? `System ${esc(s.version)}` : 'System updates',
+      text + '. If a new system does not start, JStarx goes back to the last one that worked.',
+      `<button class="btn small" id="sys-check" ${busy ? 'disabled' : ''}>${S.icon('refresh')} Check</button>` +
+      `<button class="btn primary small" id="sys-apply" ${s.state === 'available' ? '' : 'disabled'}>${S.icon('download')} Install</button>` +
+      (s.state === 'ready' ? `<button class="btn small" id="sys-reboot">${S.icon('restart')} Restart</button>` : '')));
+  }
+
   async function pageUpdates() {
     const st = await call('update.status') || {};
     const cur = (st.current || {});
@@ -160,6 +175,7 @@
       card('', item(avail ? `Update available: ${esc(avail)}` : 'Updates', stateText,
         `<button class="btn small" id="up-check">${S.icon('refresh')} Check now</button><button class="btn primary small" id="up-apply" ${avail ? '' : 'disabled'}>${S.icon('download')} Update now</button>`) +
         item('Undo the last update', 'Go back to the version you had before. Your files and settings stay.', `<button class="btn small" id="up-undo">${S.icon('restart')} Undo</button>`)) +
+      await systemUpdateCard() +
       card('Automatic updates', item('Update automatically', 'JStarx checks your GitHub repo every few hours and installs new versions. If an update breaks something, it is undone automatically.', toggle('updates.auto')) +
         item('Check every', '', slider('updates.interval_h', 1, 48, 1, ' h')) +
         item('Update from branch', 'Leave this as <b>main</b> unless you are testing.', `<input class="field" id="branch" value="${esc(get('updates.branch'))}" style="width:180px"><button class="btn small" id="branch-save">Save</button>`)) +
@@ -182,6 +198,29 @@
         item('Reset all settings', 'Wallpaper, dock and other choices go back to defaults.', `<button class="btn small danger" id="reset-settings">Reset settings</button>`)) +
       ((fixed.length || fixes.length) ? card('Last repair report', fixed.concat(fixes).map(f => `<div class="list-row">${S.icon('check')}<span class="grow">${esc(f)}</span></div>`).join('')) : '');
   }
+
+  async function pageMemory() {
+    const m = await call('memory.info') || {};
+    const saver = await call('memory.saver') || { on: true };
+    const ram = m.ram || {}, z = m.zram || {}, sf = m.swapfile || {};
+    const gb = n => n ? (n / 1073741824).toFixed(1) + ' GB' : '0 GB';
+    const pct = (a, b) => b ? Math.max(0, Math.min(100, Math.round(100 * a / b))) : 0;
+    const bar = (name, used, total, note) => `<div class="item"><div class="txt"><div class="t">${name}</div><div class="s">${note}</div></div>
+      <div class="ctl" style="min-width:300px;flex-direction:column;align-items:stretch;gap:6px"><div class="faint" style="text-align:right">${S.bytes(used || 0)} of ${S.bytes(total || 0)}</div>
+      <div class="meter" style="height:10px"><i style="width:${pct(used, total)}%"></i></div></div></div>`;
+    const ratio = z.ram_cost ? (z.stored / z.ram_cost).toFixed(1) : null;
+    const apps = (m.apps || []).map(a => item(esc(a.name), `${S.bytes(a.ram)} in RAM${a.swap ? ` · ${S.bytes(a.swap)} moved to swap` : ''}`,
+      `<div class="meter" style="width:180px"><i style="width:${pct(a.ram + a.swap, ram.total)}%"></i></div>`)).join('');
+    return `<div class="big-stat" style="--n:3"><div><span>Usable memory</span><b>${gb(m.usable)}</b></div><div><span>RAM in use</span><b>${gb(ram.used)} / ${gb(ram.total)}</b></div><div><span>Moved to swap</span><b>${gb(m.swap_used)}</b></div></div>` +
+      card('Where your memory is', bar('RAM', ram.used, ram.total, 'The Jetson\'s fast memory') +
+        bar('Compressed RAM', z.used, z.total, ratio ? `Idle apps squeezed ${ratio}× so more fits` : 'Idle apps get squeezed here first') +
+        bar('Swap file', sf.used, sf.total, 'On the SD card or SSD: idle apps wait here')) +
+      card('Keep RAM free', item('Memory saver', 'Moves apps you are not using out of RAM early, so the app you are using stays fast.',
+        `<button class="toggle" role="switch" aria-checked="${saver.on !== false}" id="mem-saver"></button>`) +
+        item('Free up memory now', 'Moves idle app memory out of RAM right now.', `<button class="btn small primary" id="mem-free">${S.icon('bolt')} Free up</button>`)) +
+      card('Apps using memory', apps || '<div class="faint" style="padding:12px 0">Nothing yet</div>');
+  }
+  setInterval(() => { if (current === 'memory' && !document.hidden) render(true); }, 4000);
 
   async function pageStorage() {
     const st = await call('system.stats') || { disk: {} };
@@ -221,7 +260,11 @@
   main.addEventListener('click', async e => {
     const t = e.target.closest('button'); if (!t) return;
     S.boing(t, .06);
-    if (t.dataset.toggle) { await setSetting(t.dataset.toggle, t.getAttribute('aria-checked') !== 'true'); return render(true); }
+    if (t.dataset.toggle) {
+      await setSetting(t.dataset.toggle, t.getAttribute('aria-checked') !== 'true');
+      if (t.dataset.toggle === 'spark.fast') await call('spark.service', { action: 'restart' }, 'Spark 1 restarted');
+      return render(true);
+    }
     if (t.dataset.choice) { const v = t.dataset.choice === 'appearance.bounce' ? +t.dataset.v : t.dataset.v; await setSetting(t.dataset.choice, v); return render(true); }
     if (t.dataset.power) { await call('power.set', { profile: t.dataset.v }, 'Power mode changed'); return render(true); }
     if (t.dataset.pin) { const list = get('dock.pinned').slice(); const i = list.indexOf(t.dataset.pin); i >= 0 ? list.splice(i, 1) : list.push(t.dataset.pin); await setSetting('dock.pinned', list); return render(true); }
@@ -262,6 +305,11 @@
         if (r && r.changed) { $('#pw-old').value = ''; $('#pw-new').value = ''; S.toast('Password changed'); }
         return;
       }
+      case 'sys-check': t.disabled = true; t.textContent = 'Checking…'; await call('update.system_check'); return render(true);
+      case 'sys-reboot': return call('session.action', { action: 'reboot' });
+      case 'sys-apply': await call('update.system_apply', {}, 'Installing the system update in the background'); return render(true);
+      case 'mem-saver': await call('memory.saver', { on: t.getAttribute('aria-checked') !== 'true' }, 'Memory saver updated'); return render(true);
+      case 'mem-free': { t.disabled = true; t.textContent = 'Freeing…'; const r = await call('memory.free'); if (r) S.toast(`Freed ${S.bytes(r.freed || 0)} of RAM`); return render(true); }
       case 'uname-save': return setSetting('user.name', $('#uname').value.trim().slice(0, 24) || 'Friend');
       case 'tz-save': return call('system.set', { key: 'timezone', value: $('#tz').value }, 'Time zone set');
     }

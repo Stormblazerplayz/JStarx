@@ -292,3 +292,87 @@ def test_password_change_needs_the_current_password(sysroot, monkeypatch, tmp_pa
         starxd.op_password_set("jstarx", "newpass1", _uid=0)
     assert starxd.op_password_set("jstarx", "newpass1", _uid=nobody)["changed"]
     assert (tmp_path / "chpasswd.out").read_text() == "nobody:newpass1\n"
+
+
+# ---------------------------------------------------------------- memory: details + freeing RAM
+def test_memory_details_has_ram_and_swap():
+    system = fresh("starx.system")
+    m = system.memory_details()
+    assert m["ram"]["total"] > 0 and m["usable"] >= m["ram"]["total"]
+    assert {"zram", "swapfile", "apps", "swap_total"} <= set(m)
+    assert all({"name", "ram", "swap"} <= set(a) for a in m["apps"])
+
+
+def test_free_memory_asks_the_kernel_to_swap_idle_apps(sysroot, monkeypatch, tmp_path):
+    cg = tmp_path / "user.slice"
+    cg.mkdir()
+    (cg / "memory.reclaim").write_text("")
+    monkeypatch.setenv("JSTARX_USER_CGROUP", str(cg))
+    starxd = fresh("jstarx_core.starxd")
+    res = starxd.op_memory_free()
+    assert int((cg / "memory.reclaim").read_text()) >= 16 << 20
+    assert "freed" in res and res["total"] > 0
+    assert starxd.op_memory_saver(False) == {"on": False}
+    assert starxd.op_memory_saver() == {"on": False}
+    assert starxd.op_memory_saver(True) == {"on": True}
+
+
+# ---------------------------------------------------------------- Spark: faster answers
+def test_spark_picks_fast_or_quality_model(tmp_path, monkeypatch):
+    monkeypatch.setenv("SPARK_ROOT", str(tmp_path))
+    spark = fresh("jstarx_core.spark")
+    os.makedirs(spark.MODELS)
+    open(os.path.join(spark.MODELS, "spark-1-q8_0.gguf"), "wb").write(b"x" * 300)
+    open(os.path.join(spark.MODELS, "spark-1-q4_k_m.gguf"), "wb").write(b"x" * 200)
+    assert spark.find_model().endswith("q8_0.gguf")
+    spark.set_cfg(fast=True)
+    assert spark.find_model().endswith("q4_k_m.gguf")
+
+
+# ---------------------------------------------------------------- whole-system updates
+def test_system_update_check_and_install(sysroot, monkeypatch, tmp_path):
+    current = tmp_path / "current-system"
+    current.mkdir()
+    monkeypatch.setenv("JSTARX_CURRENT_SYSTEM", str(current))
+    monkeypatch.setenv("JSTARX_SYSTEM_PROFILE", str(tmp_path / "profiles" / "system"))
+    sysupdate = fresh("jstarx_core.sysupdate")
+    target = "/nix/store/0123456789abcdefghijklmnopqrstuv-nixos-system-jstarx-jstarx-1.1.0"
+    rel = {"tag_name": "system-7", "assets": [
+        {"name": "system.json", "browser_download_url": "https://x/system.json", "size": 10},
+        {"name": "system-cache.tar.zst", "browser_download_url": "https://x/cache.tar.zst", "size": 4}]}
+    monkeypatch.setattr(sysupdate, "latest_release", lambda: rel)
+    monkeypatch.setattr(sysupdate, "_get", lambda url, timeout=30: json.dumps({"system": target, "version": "1.1.0"}).encode())
+    res = sysupdate.check()
+    assert res["state"] == "available" and res["version"] == "1.1.0"
+
+    class FakeResponse(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(sysupdate.urllib.request, "urlopen", lambda req, timeout=60: FakeResponse(b"zstd"))
+    ran = []
+
+    class Done:
+        returncode, stdout = 0, ""
+
+    monkeypatch.setattr(sysupdate.subprocess, "run", lambda cmd, **kw: (ran.append(cmd), Done())[1])
+    res = sysupdate.apply()
+    assert res["state"] == "ready"
+    assert ran[0][0] == "tar"
+    realise = ran[1]
+    assert realise[:3] == ["nix-store", "--realise", target] and "require-sigs" in realise and "builders" in realise
+    assert ran[2][:3] == ["nix-env", "-p", str(tmp_path / "profiles" / "system")] and ran[2][-1] == target
+    assert ran[3] == [os.path.join(target, "bin", "switch-to-configuration"), "boot"]
+
+
+def test_system_update_refuses_bad_description(sysroot, monkeypatch):
+    sysupdate = fresh("jstarx_core.sysupdate")
+    rel = {"tag_name": "system-1", "assets": [{"name": "system.json", "browser_download_url": "u"},
+                                               {"name": "system-cache.tar.zst", "browser_download_url": "u", "size": 1}]}
+    monkeypatch.setattr(sysupdate, "latest_release", lambda: rel)
+    monkeypatch.setattr(sysupdate, "_get", lambda url, timeout=30: b'{"system": "/nix/store/../../etc/evil"}')
+    with pytest.raises(RuntimeError):
+        sysupdate.apply()

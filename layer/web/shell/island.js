@@ -148,22 +148,47 @@
   }
 
   /* ---------- hover: the island opens by itself, and closes when the pointer leaves ---------- */
-  let peekTimer = null;
-  function showPeek() {
-    if (mode !== 'compact') return;
+  let peekTimer = null, peekTab = 'today';
+  const PEEK = { w: 460, h: 108 };
+  async function peekBody() {
+    if (peekTab === 'memory') {
+      let m = {}; try { m = await S.call('memory.info'); } catch (e) { }
+      const ram = m.ram || {}, gb = n => ((n || 0) / 1073741824).toFixed(1);
+      const pr = ram.total ? Math.round(100 * ram.used / ram.total) : 0;
+      const ps = m.swap_total ? Math.round(100 * m.swap_used / m.swap_total) : 0;
+      return `<div class="pmem"><div class="pml"><span>${S.icon('memory')}<b>${gb(ram.used)}</b> of ${gb(ram.total)} GB RAM</span><span class="faint">${gb(m.usable)} GB usable</span></div>
+          <div class="meter"><i style="width:${pr}%"></i></div>
+          <div class="pml"><span>${S.icon('disk')}<b>${gb(m.swap_used)}</b> of ${gb(m.swap_total)} GB swap</span><span class="faint">idle apps</span></div>
+          <div class="meter swap"><i style="width:${ps}%"></i></div></div>`;
+    }
     const st = Shell.status || {};
     const now = new Date();
     const wired = (net.devices || []).some(d => d.type === 'ethernet' && String(d.state).startsWith('connected'));
     const ai = (st.ai && st.ai.jobs || []).filter(j => j.state === 'running');
     const prof = { saver: 'Battery saver', balanced: 'Balanced', performance: 'Performance' }[power.profile] || 'Balanced';
-    $('#peek').innerHTML = `<div><div class="pbig">${S.esc(S.time(now))}</div>
+    return `<div><div class="pbig">${S.esc(S.time(now))}</div>
         <div class="pdate">${S.esc(now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))}</div></div>
       <div class="prow"><span>${S.icon(wired ? 'ethernet' : (net.ssid ? 'wifi' : 'wifiOff'))}${S.esc(wired ? 'Ethernet' : (net.ssid || 'Not connected'))}</span>
         <span>${S.icon('bolt')}${S.esc(prof)}</span>
         <span>${S.icon('chip')}${ai.length ? `${ai.length} AI job${ai.length > 1 ? 's' : ''} running` : 'AI ready'}</span></div>`;
-    surface(true, 440, 96);  // the surface hugs the open card, so little of the app is covered
-    setTimeout(() => { setSize(440, 96); show('peek'); }, 30);
   }
+  async function renderPeek() {
+    const body = await peekBody();
+    const tabs = ['today', 'memory'].map(t => `<button data-tab="${t}" class="${t === peekTab ? 'on' : ''}">${t === 'today' ? 'Today' : 'Memory'}</button>`).join('');
+    $('#peek').innerHTML = `<div class="ptabs">${tabs}</div><div class="pbody">${body}</div>`;
+    $('#peek').querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();  // a tab click must not open Control Center
+      peekTab = b.dataset.tab;
+      renderPeek();
+    }));
+  }
+  async function showPeek() {
+    if (mode !== 'compact') return;
+    await renderPeek();
+    surface(true, PEEK.w, PEEK.h);  // the surface hugs the open card, so little of the app is covered
+    setTimeout(() => { setSize(PEEK.w, PEEK.h); show('peek'); }, 30);
+  }
+  setInterval(() => { if (mode === 'peek' && peekTab === 'memory') renderPeek(); }, 3000);
   island.addEventListener('mouseenter', () => {
     clearTimeout(peekTimer);
     if (mode === 'compact') peekTimer = setTimeout(showPeek, 260);

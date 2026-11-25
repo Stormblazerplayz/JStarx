@@ -809,7 +809,7 @@ def read_gguf_header(path):
 
 
 # ---------------------------------------------------------------- whole conversion
-def convert(checkpoint, folder, out_dir=None, quantize="Q8_0", log=print, detect=True):
+def convert(checkpoint, folder, out_dir=None, quantize=("Q8_0", "Q4_K_M"), log=print, detect=True):
     """Checkpoint + tokenizer files in `folder` -> spark-1-<quant>.gguf. Returns a result dict."""
     out_dir = out_dir or folder
     model = Model(checkpoint)
@@ -845,18 +845,21 @@ def convert(checkpoint, folder, out_dir=None, quantize="Q8_0", log=print, detect
     f16 = os.path.join(out_dir, "spark-1-f16.gguf")
     write_gguf(model, tok, rope, f16, log=log)
     final = f16
-    if quantize:
-        exe = _which("llama-quantize")
-        if exe:
-            q = os.path.join(out_dir, f"spark-1-{quantize.lower()}.gguf")
-            log(f"quantizing to {quantize}…")
-            r = subprocess.run([exe, f16, q, quantize], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-            if r.returncode == 0 and os.path.exists(q):
-                os.remove(f16)
-                final = q
-            else:
-                log("quantize failed, keeping the f16 file: " + (r.stderr or "")[-200:])
-    return {"state": "converted", "gguf": final, "rope": rope, "tokenizer_matches": tok_ok,
+    made = []
+    exe = _which("llama-quantize") if quantize else None
+    # Q8_0 = best quality; Q4_K_M = about twice as fast on the Jetson's CPU ("Faster answers")
+    for qtype in ([quantize] if isinstance(quantize, str) else list(quantize or [])) if exe else []:
+        q = os.path.join(out_dir, f"spark-1-{qtype.lower()}.gguf")
+        log(f"making the {qtype} copy…")
+        r = subprocess.run([exe, f16, q, qtype], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if r.returncode == 0 and os.path.exists(q):
+            made.append(q)
+        else:
+            log(f"{qtype} failed: " + (r.stderr or "")[-200:])
+    if made:
+        os.remove(f16)
+        final = made[0]
+    return {"state": "converted", "gguf": final, "models": made or [f16], "rope": rope, "tokenizer_matches": tok_ok,
             "tokenizer": os.path.basename(tok["path"]), "template_guessed": not (tok["config"].get("chat_template") or find_tokenizer_files(folder)["template"])}
 
 

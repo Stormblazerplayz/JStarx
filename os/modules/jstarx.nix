@@ -175,7 +175,8 @@ in
       "widget.use-xdg-desktop-portal.file-picker" = 1;
       "ui.systemUsesDarkTheme" = 1;
       "browser.theme.toolbar-theme" = 0;
-      "browser.tabs.inTitlebar" = 0;   # JStarx title bar: the Dynamic Island sits in it
+      "browser.tabs.inTitlebar" = 1;   # Firefox draws its own top bar, which curves around the island
+      "toolkit.legacyUserProfileCustomizations.stylesheets" = true;   # use the JStarx userChrome.css
       "media.ffmpeg.vaapi.enabled" = false;
     };
   };
@@ -245,7 +246,7 @@ in
     description = "JStarx system helper";
     wantedBy = [ "multi-user.target" ];
     after = [ "jstarx-repair.service" ];
-    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip shadow llama-cpp ];
+    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip zstd shadow llama-cpp ];
     environment.JSTARX_UNIX_CHKPWD = "${pkgs.pam}/bin/unix_chkpwd";
     serviceConfig = { ExecStart = "${core}/bin/starxd"; Restart = "always"; RestartSec = 2; };
   };
@@ -291,8 +292,8 @@ in
     description = "JStarx auto-update from GitHub";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = with pkgs; [ systemd coreutils ];
-    serviceConfig = { Type = "oneshot"; ExecStart = "${core}/bin/jstarx-update auto"; Nice = 10; };
+    path = with pkgs; [ systemd coreutils nix gnutar zstd ];
+    serviceConfig = { Type = "oneshot"; ExecStart = "${core}/bin/jstarx-update auto"; Nice = 10; TimeoutStartSec = "6h"; };
   };
   systemd.timers.jstarx-update = {
     wantedBy = [ "timers.target" ];
