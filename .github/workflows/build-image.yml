@@ -1,7 +1,8 @@
 # Builds the JStarx OS SD card image for the Jetson Nano, and the whole-system update.
-# Runs for pull requests, from the Actions tab ("Run workflow"), for pushes to main (then it also
-# publishes a "system-N" release that Jetsons install as a whole-system update), and for tags like
-# v1.0.0 (then it publishes a release with the SD card image). Download files from the run's "Artifacts".
+# Runs for pull requests, from the Actions tab ("Run workflow"), for pushes to main and for tags
+# like v1.0.0. Pushes to main and tags publish the release "v<version>" (version from layer/layer.json)
+# with the SD card image; pushes to main also publish a "system-N" release that Jetsons install as a
+# whole-system update. Every run also keeps the files under the run's "Artifacts".
 name: Build JStarx OS image
 
 on:
@@ -52,6 +53,7 @@ jobs:
       - name: Compress the image
         run: |
           version=$(jq -r .version layer/layer.json)
+          echo "JSTARX_VERSION=$version" >> "$GITHUB_ENV"
           mkdir out
           xz -T0 -6 -c result-sd/sd-image/*.img > "out/jstarx-${version}-jetson-nano.img.xz"
           ls -lh out
@@ -96,8 +98,26 @@ jobs:
             out/system.json
             out/system-cache.tar.zst
 
+      - name: Write the release notes
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+        run: |
+          jq -r '"JStarx \(.version) (\(.codename)) for the Jetson Nano.\n\n" +
+            "**Install:** download `jstarx-\(.version)-jetson-nano.img.xz`, flash it to a microSD card (32 GB or bigger) " +
+            "with balenaEtcher, put the card in the Jetson Nano and turn it on.\n\n### New in \(.version)\n" +
+            (.notes | map("- " + .) | join("\n"))' layer/layer.json > release-notes.md
+          cat release-notes.md
+
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: softprops/action-gh-release@v2
         with:
-          files: out/*
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', env.JSTARX_VERSION) }}
+          target_commitish: ${{ github.sha }}
+          name: JStarx ${{ env.JSTARX_VERSION }}
+          body_path: release-notes.md
+          make_latest: true
+          files: |
+            out/jstarx-*.img.xz
+            out/SHA256SUMS
+            out/system.json
+            out/system-cache.tar.zst
