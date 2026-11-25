@@ -295,6 +295,7 @@ def main():
     ap.add_argument("--no-display", action="store_true", help="start with no screen: JStarx should look for a wireless display")
     ap.add_argument("--repair-only", action="store_true", help="only boot, then run the auto-repair tests")
     ap.add_argument("--fallback-only", action="store_true", help="only boot, then test going back from a broken build")
+    ap.add_argument("--memory-only", action="store_true", help="only boot, then test that idle memory moves to swap")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for f in ("serial.log", "report.md"):
@@ -376,6 +377,10 @@ def run_tests(vm, rep, args):
         vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 1500, every=15)
         rep.check("StarShell desktop started", True)
         return run_fallback_test(vm, rep, args)
+    if args.memory_only:
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null && test -S /run/user/1000/jstarx/shell.sock", 1500, every=15)
+        rep.check("StarShell desktop started", True)
+        return run_memory_test(vm, rep, args)
     # ---------------------------------------------------------------- 2. system
     _, kernel = vm.sh("uname -r; cat /proc/version")
     rep.check("Runs the StarX Kernel", "6.12.118-starx" in kernel and "1-StarX" in kernel, kernel.splitlines()[0] if kernel else "")
@@ -441,6 +446,51 @@ def run_tests(vm, rep, args):
     vm.sh("pkill -f firefox || true")
 
     run_repair_tests(vm, rep, args)
+
+
+def memory_snapshot(vm):
+    """Bytes used by background services and apps, RAM free and swap used."""
+    _, txt = vm.sh("cat /sys/fs/cgroup/system.slice/memory.current /sys/fs/cgroup/user.slice/memory.current; "
+                   "awk '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ {print $2}' /proc/meminfo")
+    n = [int(x) for x in txt.split() if x.isdigit()]
+    if len(n) < 6:
+        raise RuntimeError(f"could not read memory use: {txt[:200]}")
+    return {"services": n[0], "apps": n[1], "total": n[2] * 1024, "free": n[3] * 1024, "swap": (n[4] - n[5]) * 1024}
+
+
+def run_memory_test(vm, rep, args):
+    """JStarx 2.0.1: only what is in use stays in RAM (swappiness 200, memory saver sweep)."""
+    mb = lambda b: f"{b / 1048576:.0f} MB"
+    vm.sh("pkill -u storm -x swayidle || true")  # keep the screen on for the screenshot
+    _, sw = vm.sh("cat /proc/sys/vm/swappiness")
+    rep.check("Swappiness is 200 (idle memory goes to swap first)", sw.split()[-1:] == ["200"], sw.strip())
+    code, state = vm.sh("systemctl is-active starxd")
+    rep.check("Service starxd is running", code == 0, state.strip())
+    _, failed = vm.sh("systemctl --failed --no-legend --plain | grep -v '^$' || true")
+    rep.check("No failed services", failed.strip() == "", failed.strip())
+    vm.sh("sleep 60", 120)  # let the desktop settle
+    a = memory_snapshot(vm)
+    vm.sh("sleep 330", 400)  # 11 memory saver sweeps
+    b = memory_snapshot(vm)
+    moved = (a["services"] + a["apps"]) - (b["services"] + b["apps"])
+    rep.check("Memory saver moves idle memory out of RAM by itself",
+              moved > (24 << 20) or b["swap"] - a["swap"] > (16 << 20),
+              f"services {mb(a['services'])} -> {mb(b['services'])}, apps {mb(a['apps'])} -> {mb(b['apps'])}, "
+              f"swap used {mb(a['swap'])} -> {mb(b['swap'])}, RAM free {mb(a['free'])} -> {mb(b['free'])} of {mb(a['total'])}")
+    _, errs = vm.sh("journalctl -u starxd -b --no-pager | grep -c 'memory saver:' || true")
+    rep.check("Memory saver runs without errors", errs.strip().splitlines()[-1:] == ["0"], errs.strip())
+    code, res = vm.sh("starx-python -c \"import sys; sys.path.insert(0, '/var/lib/jstarx/layers/current'); "
+                      "from starx import daemon; print(daemon.starxd('memory_free', timeout=200))\"", 300)
+    c = memory_snapshot(vm)
+    rep.check("Free up now works", code == 0 and "freed" in res,
+              f"RAM free {mb(b['free'])} -> {mb(c['free'])}, swap used {mb(b['swap'])} -> {mb(c['swap'])}; {res.strip()[-120:]}")
+    _, health = vm.sh(f"{CTL} health")
+    rep.check("Desktop still answers after moving memory to swap", '"ok": true' in health, health[:200])
+    code, _ = vm.sh(f"{CTL} launchpad")
+    time.sleep(40)
+    vm.monitor.screenshot(os.path.join(args.out, "launchpad-after-swap.png"))
+    vm.sh(f"{CTL} close")
+    snapshot_resources(vm, rep, args.out)
 
 
 def run_repair_tests(vm, rep, args):

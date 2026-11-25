@@ -34,8 +34,14 @@ def latest_release():
     rels = [r for r in rels if str(r.get("tag_name", "")).startswith("system-") and not r.get("draft")]
     if not rels:
         return None
-    rels.sort(key=lambda r: r.get("published_at") or r.get("created_at") or "", reverse=True)
+    rels.sort(key=lambda r: (_build_number(r), r.get("published_at") or r.get("created_at") or ""), reverse=True)
     return rels[0]
+
+
+def _build_number(rel):
+    """system-N: the higher N, the newer the build (builds can finish out of order)."""
+    tail = str(rel.get("tag_name", ""))[len("system-"):]
+    return int(tail) if tail.isdigit() else -1
 
 
 def _asset(rel, name):

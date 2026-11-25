@@ -14,7 +14,9 @@ on:
     paths: ["os/**", "layer/**", "default.nix", ".github/workflows/build-image.yml"]
 
 concurrency:
-  group: image-${{ github.ref }}
+  # a new push to a pull request cancels its older build; builds of main (and tags) always finish,
+  # so a push during a build never loses the release that build was making
+  group: image-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: true
 
 permissions:

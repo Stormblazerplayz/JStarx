@@ -394,6 +394,16 @@ def test_sweep_moves_a_little_idle_memory_and_backs_off(sysroot, monkeypatch, tm
     assert asked(root3, "system.slice") == 64 << 20
 
 
+def test_newest_system_update_is_the_highest_build_number(monkeypatch):
+    sysupdate = fresh("jstarx_core.sysupdate")
+    rels = [{"tag_name": "system-12", "published_at": "2026-11-25T22:40:00Z"},
+            {"tag_name": "system-13", "published_at": "2026-11-25T22:30:00Z"},  # newer build, finished first
+            {"tag_name": "v2.0.0", "published_at": "2026-11-25T23:00:00Z"},
+            {"tag_name": "system-14", "draft": True, "published_at": None}]
+    monkeypatch.setattr(sysupdate, "_get", lambda url, *a, **k: json.dumps(rels).encode())
+    assert sysupdate.latest_release()["tag_name"] == "system-13"
+
+
 # ---------------------------------------------------------------- Spark: faster answers
 def test_spark_picks_fast_or_quality_model(tmp_path, monkeypatch):
     monkeypatch.setenv("SPARK_ROOT", str(tmp_path))
