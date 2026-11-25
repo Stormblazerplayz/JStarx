@@ -1,7 +1,7 @@
 """starx-ctl: send a command to the running shell.
 
 Examples:  starx-ctl launchpad | start | control | spark | power | close
-           starx-ctl osd volume | launch firefox | idle on | health
+           starx-ctl osd volume | launch firefox | idle on | health | state
            starx-ctl notify '{"summary": "Hello", "body": "From a script"}'
 """
 import json

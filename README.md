@@ -51,14 +51,24 @@ The first start takes a bit longer because JStarx grows to fill your whole SD ca
 
 ## Spark 1 (the assistant)
 
-Spark 1's model file is too big for git, so it lives in a GitHub **release**:
+Spark 1 is Storm's own model: a Llama-style transformer with 20 layers, 1024 wide, 16 attention
+heads (4 key/value heads), a 33,039-token vocabulary and a 4,096-token context (about 300M
+parameters). Its weights are in the **Spark1** release of this repo (`sft_best.pt`).
 
-1. On GitHub: **Releases → Draft a new release**, tag `spark-1`.
-2. Drag the model file (a `.gguf`, or a `.safetensors`/`.bin` with its config files) into the
-   box that says **"Attach binaries by dropping them here"**, then **Publish release**.
-3. On the Jetson: **Settings → AI & Spark → Download Spark 1**. It downloads, checks and starts it.
+JStarx gets it ready by itself:
 
-You can also copy the file onto the Jetson and use **Import from file**.
+1. When the Jetson is online, it downloads every file in the Spark1 release (it checks each file's
+   checksum, and skips files it already has). You can also press **Settings → AI & Spark → Download Spark 1**.
+2. It reads the PyTorch checkpoint safely (no code inside the file is ever run), works out how the
+   model encodes word positions, and converts it to GGUF (8-bit, about 330 MB).
+3. llama.cpp runs it on the Jetson. Ask Spark from the island, the Start menu or `Super + Space`.
+
+**One more file is needed:** the tokenizer Spark 1 was trained with. The checkpoint remembers its
+fingerprint (sha256 `88c43f2c…`). Open the Spark1 release → **Edit** → drag `tokenizer.json` into
+the **"Attach binaries by dropping them here"** box → **Update release**. If you have
+`tokenizer_config.json` (it holds the chat format), upload that too. Then JStarx finishes the setup.
+
+You can also copy the files onto the Jetson and use **Import from file**.
 
 ## Auto repair: what happens when something breaks
 

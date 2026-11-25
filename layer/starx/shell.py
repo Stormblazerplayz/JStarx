@@ -200,6 +200,7 @@ class Shell:
         self.status_cache = {}
         self.started = time.time()
         self.overlay_panel = None
+        self._pending_overlay = None
 
         self.notes = NotificationServer(self._on_note, lambda nid: self.bridge.emit("notification-closed", nid))
 
@@ -281,6 +282,10 @@ class Shell:
     # ---------------------------------------------------------------- overlay
     def open_overlay(self, panel, data=None):
         ov = self.surfaces["overlay"]
+        if id(ov.view) not in self.ready_views:
+            # the overlay page is still loading (slow start): open the panel as soon as it is ready
+            self._pending_overlay = (panel, data)
+            return
         self.overlay_panel = panel
         ov.win.show_all()
         ov.repaint()
@@ -288,6 +293,7 @@ class Shell:
         self.bridge.emit("overlay-state", {"panel": panel})
 
     def close_overlay(self):
+        self._pending_overlay = None
         self.overlay_panel = None
         self.surfaces["overlay"].win.hide()
         self.bridge.emit("overlay-state", {"panel": None})
@@ -378,6 +384,11 @@ class Shell:
     # ---------------------------------------------------------------- health (used by auto-repair)
     def surface_ready(self, view):
         self.ready_views.add(id(view))
+        ov = getattr(self, "surfaces", {}).get("overlay")
+        if ov is not None and view is ov.view and self._pending_overlay:
+            panel, data = self._pending_overlay
+            self._pending_overlay = None
+            self.open_overlay(panel, data)
 
     def _report_health(self):
         healthy = len(self.ready_views) >= 3
@@ -449,6 +460,10 @@ class Shell:
                 return {"ok": False, "error": "bad json"}
         elif cmd == "health":
             return {"ok": True, "healthy": len(self.ready_views) >= 3, "uptime": time.time() - self.started}
+        elif cmd == "state":
+            return {"ok": True, "overlay": self.overlay_panel, "pending": (self._pending_overlay or [None])[0],
+                    "surfaces": len(self.ready_views), "idle": self.idle, "layer": os.environ.get("JSTARX_LAYER"),
+                    "safe_mode": os.environ.get("STARX_SAFE_MODE") == "1"}
         elif cmd == "js" and os.environ.get("STARX_TEST") == "1":
             surface, _, code = arg.partition(" ")
             s = self.surfaces.get(surface)

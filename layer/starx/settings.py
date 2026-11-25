@@ -33,7 +33,7 @@ DEFAULTS = {
     "clock": {"h24": True},
     "power": {"screen_off_min": 5, "dim_min": 3},
     "spark": {
-        "model_url": "https://github.com/Stormblazerplayz/JStarx/releases/download/spark-1/",
+        "model_url": "https://github.com/Stormblazerplayz/JStarx/releases/tag/Spark1",
         "threads": 4,
         "ctx": 2048,
         "personality": "You are Spark 1, the friendly built-in assistant of JStarx OS. Keep answers short and clear.",

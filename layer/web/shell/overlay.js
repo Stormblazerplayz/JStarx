@@ -18,7 +18,8 @@
   function hidePanel(panel, instant) { const el = elFor(panel); if (el) el.classList.add('hidden'); if (panel === 'launchpad') $('#lp-folder').classList.add('hidden'); }
 
   async function close() {
-    if (!current || closing) return;
+    if (closing) return;
+    if (!current) { S.send('shell.close'); return; }  // never leave an empty overlay on screen
     closing = true;
     const panel = current;
     const el = panel === 'power' ? $('#power') : panel === 'welcome' ? $('#welcome') : $('#' + panel);

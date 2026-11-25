@@ -327,7 +327,7 @@ class Api:
     def m_spark_status(self, view=None):
         st = daemon.status("spark")
         try:
-            with urllib.request.urlopen(paths.SPARK_URL + "/health", timeout=2) as r:
+            with _LOCAL.open(paths.SPARK_URL + "/health", timeout=2) as r:
                 st["engine"] = json.load(r).get("status", "ok")
         except Exception:
             st["engine"] = "offline"
@@ -357,10 +357,11 @@ class Api:
 
         def work():
             err = None
+            got = False
             try:
                 rq = urllib.request.Request(paths.SPARK_URL + "/v1/chat/completions", data=json.dumps(body).encode(),
                                             headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(rq, timeout=300) as r:
+                with _LOCAL.open(rq, timeout=300) as r:
                     for raw in r:
                         if stop.is_set():
                             break
@@ -371,14 +372,27 @@ class Api:
                         if data == "[DONE]":
                             break
                         try:
-                            delta = json.loads(data)["choices"][0].get("delta", {}).get("content")
-                        except (ValueError, KeyError, IndexError):
+                            obj = json.loads(data)
+                        except ValueError:
+                            continue
+                        if isinstance(obj, dict) and obj.get("error"):
+                            if not got:  # a problem before any words: say so; after some words, keep what we have
+                                e = obj["error"]
+                                err = "Spark 1 had a problem: " + str(e.get("message", e) if isinstance(e, dict) else e)[:200]
+                            break
+                        try:
+                            delta = obj["choices"][0].get("delta", {}).get("content")
+                        except (KeyError, IndexError, TypeError, AttributeError):
                             delta = None
                         if delta:
+                            got = True
                             self.bridge.emit_threadsafe("spark-token", {"req": req, "text": delta}, [view])
+            except urllib.error.HTTPError as e:
+                err = f"Spark 1 had a problem (error {e.code}). Try again in a moment."
+            except (urllib.error.URLError, ConnectionError, OSError):
+                err = "Spark 1 isn't running yet. Install the Spark 1 model in Settings → AI & Spark."
             except Exception as e:
-                err = "Spark 1 isn't running yet. Install the Spark 1 model in Settings → AI & Spark." \
-                    if isinstance(e, (urllib.error.URLError, ConnectionError, OSError)) else str(e)
+                err = str(e)
             self.bridge.emit_threadsafe("spark-done", {"req": req, "error": err}, [view])
             self._spark_streams.pop(req, None)
 
@@ -390,6 +404,10 @@ class Api:
         if ev:
             ev.set()
         return True
+
+
+# requests to services on this Jetson never go through a proxy
+_LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 
 def _notify_shell(command):

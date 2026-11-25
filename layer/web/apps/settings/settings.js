@@ -130,12 +130,13 @@
     const sp = await call('spark.status') || {};
     const ready = sp.engine === 'ok';
     const state = ready ? '<span class="chip good">Running</span>' : sp.state === 'downloading' ? `<span class="chip accent">Downloading ${sp.progress || 0}%</span>` :
-      sp.model ? '<span class="chip warn">Starting</span>' : '<span class="chip warn">No model yet</span>';
+      sp.state === 'converting' ? '<span class="chip accent">Converting</span>' : sp.state === 'needs-tokenizer' ? '<span class="chip warn">Needs tokenizer</span>' :
+      sp.state === 'error' ? '<span class="chip bad">Problem</span>' : sp.model ? '<span class="chip warn">Starting</span>' : '<span class="chip warn">No model yet</span>';
     return `<div class="big-stat" style="--n:3"><div><span>Spark 1</span><b>${ready ? 'Ready' : 'Waiting'}</b></div><div><span>Model file</span><b style="font-size:16px;word-break:break-all">${esc(sp.model || '—')}</b></div><div><span>Size</span><b>${sp.size ? S.bytes(sp.size) : '—'}</b></div></div>` +
       card('Get the Spark 1 model', item('Status', esc(sp.message || 'Spark answers questions on this Jetson, with no internet needed once installed.'), state) +
-        item('Download from GitHub release', 'The release your model is uploaded to. JStarx downloads every model file it finds there.', `<input class="field" id="model-url" value="${esc(get('spark.model_url'))}" style="width:320px">`) +
+        item('Download from GitHub release', 'The release your model is uploaded to (sft_best.pt + tokenizer.json). JStarx downloads every model file there and converts it.', `<input class="field" id="model-url" value="${esc(get('spark.model_url'))}" style="width:320px">`) +
         `<div class="item"><div class="txt"></div><div class="ctl"><button class="btn primary small" id="spark-dl">${S.icon('download')} Download Spark 1</button></div></div>` +
-        item('Or use a file you already have', 'Full path to a .gguf model file (for example on a USB stick).', `<input class="field" id="model-path" placeholder="/run/media/storm/USB/spark-1.gguf" style="width:320px"><button class="btn small" id="spark-import">Import</button>`)) +
+        item('Or use a file you already have', 'Full path to a .gguf or .pt model file, or its tokenizer.json (for example on a USB stick).', `<input class="field" id="model-path" placeholder="/run/media/storm/USB/sft_best.pt" style="width:320px"><button class="btn small" id="spark-import">Import</button>`)) +
       card('Engine', item('Spark engine', 'llama.cpp running on this Jetson (127.0.0.1:8090).', `<button class="btn small" data-spark="restart">${S.icon('restart')} Restart</button><button class="btn small" data-spark="stop">${S.icon('stop')} Stop</button>`) +
         item('CPU threads', '', slider('spark.threads', 1, 8, 1)) + item('Memory (context length)', 'Longer means Spark remembers more of the chat but uses more RAM.', slider('spark.ctx', 512, 8192, 512, ' tokens'))) +
       card('Personality', `<div style="padding:12px 0"><textarea class="field" id="persona">${esc(get('spark.personality'))}</textarea><div style="margin-top:10px;text-align:right"><button class="btn small" id="persona-save">Save</button></div></div>`) +

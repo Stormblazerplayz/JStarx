@@ -232,7 +232,7 @@ in
     description = "JStarx system helper";
     wantedBy = [ "multi-user.target" ];
     after = [ "jstarx-repair.service" ];
-    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip shadow ];
+    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip shadow llama-cpp ];
     environment.JSTARX_UNIX_CHKPWD = "${pkgs.pam}/bin/unix_chkpwd";
     serviceConfig = { ExecStart = "${core}/bin/starxd"; Restart = "always"; RestartSec = 2; };
   };

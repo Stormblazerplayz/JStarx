@@ -30,7 +30,8 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UBOOT = ["/usr/lib/u-boot/qemu_arm64/u-boot.bin", "/usr/share/u-boot/qemu_arm64/u-boot.bin"]
 USER, PASSWORD = "storm", "jstarx"
-SESSION_ENV = "XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 STARX_PYTHON=starx-python"
+SESSION_ENV = ("XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0 STARX_PYTHON=starx-python "
+               "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus MOZ_ENABLE_WAYLAND=1")
 CTL = f"sudo -u {USER} env {SESSION_ENV} /var/lib/jstarx/layers/current/bin/starx-ctl"
 
 
@@ -201,7 +202,7 @@ class Machine:
         self.n += 1
         tag = f"_JX{self.n}_"
         m = self.serial.mark()
-        self.serial.send(f"{cmd} ; echo {tag}$?{tag}\n")
+        self.serial.send(f"{cmd}\necho {tag}$?{tag}\n")
         r = self.serial.wait(rf"{tag}(\d+){tag}", timeout, m)
         out = self.serial.text(m)[: r.start()].replace("\r", "").strip("\n")
         code = int(r.group(1))
@@ -344,7 +345,15 @@ def run_tests(vm, rep, args):
     except Timeout as e:
         rep.check("StarShell desktop started", False, str(e))
         vm.sh("tail -40 /run/user/1000/jstarx/session.log /run/user/1000/jstarx/supervisor.log 2>/dev/null")
-    time.sleep(90)  # let the slow emulated CPU finish drawing
+    code, _ = vm.sh("pgrep -u storm -x swayidle >/dev/null")
+    rep.check("Screen power saving is on", code == 0)
+    vm.sh("pkill -u storm -x swayidle || true")  # keep the screen on for the screenshots
+    time.sleep(120)  # let the slow emulated CPU finish drawing
+    vm.monitor.screenshot(os.path.join(out, "welcome.png"))
+    _, state = vm.sh(f"{CTL} state")
+    rep.check("Welcome screen opens on the first start", '"welcome"' in state, state[:160])
+    vm.sh(f"{CTL} close")
+    time.sleep(30)
     vm.monitor.screenshot(os.path.join(out, "desktop.png"))
     _, health = vm.sh(f"{CTL} health")
     rep.check("Desktop answers (dock, island, home)", '"ok": true' in health, health[:200])
@@ -394,6 +403,7 @@ def run_tests(vm, rep, args):
     except Timeout:
         on_a = False
     rep.check("Desktop restarts on the updated layer (slot A)", on_a)
+    vm.sh("sleep 5; pkill -u storm -x swayidle || true")
     for i in range(3):
         _, pid = vm.sh("pgrep -u storm -f 'starx.shell' | head -1")
         vm.sh("pkill -9 -u storm -f 'starx.shell' || true")
