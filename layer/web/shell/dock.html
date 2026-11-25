@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>JStarx Dock</title>
+<link rel="stylesheet" href="../common/theme.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  body { overflow: hidden; }
+  .dock { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: 8px; display: flex; align-items: flex-end;
+    gap: 8px; padding: 8px 12px; border-radius: 26px; --sz: 54px; transition: transform .5s var(--spring), opacity .3s; }
+  .dock.hidden-away { transform: translateY(calc(100% + 6px)); }
+  .di { position: relative; width: var(--sz); height: var(--sz); flex: none; transform-origin: 50% 100%;
+    transition: transform .16s var(--ease), width .16s var(--ease); }
+  .dock.settle .di { transition: transform .5s var(--spring), width .5s var(--spring); }
+  .di img, .di .sys { width: 100%; height: 100%; display: block; border-radius: 26%; }
+  .di .sys { display: grid; place-items: center; color: #fff;
+    background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.06)); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 0 0 1px rgba(255,255,255,.2); }
+  .di .sys .ico { width: 46%; height: 46%; }
+  .di.start .sys { background: none; box-shadow: none; }
+  .di.start img { filter: drop-shadow(0 6px 10px rgba(255,138,0,.35)); }
+  .di .dot { position: absolute; left: 50%; bottom: -7px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%;
+    background: var(--o-400); box-shadow: 0 0 8px var(--o-500); opacity: 0; transform: scale(0); transition: all .4s var(--spring); }
+  .di.running .dot { opacity: 1; transform: scale(1); }
+  .sep { width: 1px; align-self: stretch; margin: 6px 2px; background: rgba(255,255,255,.22); }
+  .tip { display: none; position: absolute; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%); padding: 5px 12px; border-radius: 10px;
+    white-space: nowrap; font-size: 13px; font-weight: 650; pointer-events: none; opacity: 0; transition: opacity .15s; background: rgba(26,6,56,.92);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.35); }
+  .di:hover .tip { opacity: 1; }
+</style>
+</head>
+<body>
+<nav class="dock glass" id="dock" aria-label="Dock"></nav>
+<script src="../common/starx.js"></script>
+<script src="common.js"></script>
+<script src="dock.js"></script>
+</body>
+</html>

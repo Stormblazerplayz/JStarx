@@ -1,0 +1,12 @@
+{
+  "name": "JStarx Layer",
+  "version": "1.0.0",
+  "codename": "Nebula",
+  "released": "2026-11-25",
+  "notes": [
+    "First release of JStarx OS: StarShell desktop, dynamic island, dock, launchpad and folders",
+    "Settings, Star Store, AI Center, Spark 1 assistant, Claude and Firefox",
+    "Auto-update from GitHub, auto-repair, power profiles, wireless display casting",
+    "Games: Star Snake, Nebula Dodge, Starbreaker"
+  ]
+}

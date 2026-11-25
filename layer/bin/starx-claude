@@ -1,0 +1,10 @@
+#!/bin/sh
+# Claude as a light app window: Firefox in app mode with its own small profile (no extra browser engine).
+LAYER="${JSTARX_LAYER:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
+PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/jstarx/claude-firefox"
+if [ ! -f "$PROFILE/user.js" ]; then
+  mkdir -p "$PROFILE/chrome"
+  cp "$LAYER/assets/claude/userChrome.css" "$PROFILE/chrome/userChrome.css"
+  cp "$LAYER/assets/claude/user.js" "$PROFILE/user.js"
+fi
+exec firefox --new-instance --profile "$PROFILE" --name claude --class claude "https://claude.ai/new" "$@"

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+  <linearGradient id="gStar" x1=".15" y1=".05" x2=".85" y2=".95">
+    <stop offset="0" stop-color="#E0AAFF"/><stop offset=".42" stop-color="#B15CFF"/>
+    <stop offset=".74" stop-color="#FF8A3D"/><stop offset="1" stop-color="#FFD166"/>
+  </linearGradient>
+  <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C77DFF"/><stop offset=".5" stop-color="#9D4EDD"/><stop offset="1" stop-color="#5A189A"/>
+  </linearGradient>
+  <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFD166"/><stop offset=".55" stop-color="#FF8A00"/><stop offset="1" stop-color="#F25C05"/>
+  </linearGradient>
+  <linearGradient id="gSpec" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".48" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#3C096C"/><stop offset=".55" stop-color="#240046"/><stop offset="1" stop-color="#10002B"/>
+  </linearGradient>
+  <radialGradient id="gGlowP" cx=".2" cy=".15" r=".75">
+    <stop offset="0" stop-color="#C77DFF" stop-opacity=".55"/><stop offset="1" stop-color="#C77DFF" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="gGlowO" cx=".82" cy=".88" r=".65">
+    <stop offset="0" stop-color="#FF8A00" stop-opacity=".55"/><stop offset="1" stop-color="#FF8A00" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="fShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0B0018" flood-opacity=".55"/>
+  </filter>
+  <filter id="fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="fBlur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+<clipPath id="cBadge"><rect x="16" y="16" width="480" height="480" rx="120"/></clipPath></defs>
+<g clip-path="url(#cBadge)"><rect width="512" height="512" fill="url(#gBg)"/><rect width="512" height="512" fill="url(#gGlowP)"/><rect width="512" height="512" fill="url(#gGlowO)"/><path d="M44 170 C60 82 116 40 200 32" stroke="#fff" stroke-opacity=".32" stroke-width="7" fill="none" stroke-linecap="round"/></g>
+<defs><linearGradient id="gTail" gradientUnits="userSpaceOnUse" x1="334" y1="120" x2="150" y2="400"><stop offset="0" stop-color="#FF8A00"/><stop offset=".55" stop-color="#B15CFF"/><stop offset="1" stop-color="#7B2CBF" stop-opacity=".2"/></linearGradient></defs>
+<path d="M334 128 C334 250 334 324 292 378 C254 428 176 424 150 368" fill="none" stroke="url(#gTail)" stroke-width="78" stroke-linecap="round" opacity=".25"/>
+<path d="M334 128 C334 250 334 324 292 378 C254 428 176 424 150 368" fill="none" stroke="url(#gTail)" stroke-width="50" stroke-linecap="round" opacity=".55"/>
+<path d="M334 128 C334 250 334 324 292 378 C254 428 176 424 150 368" fill="none" stroke="url(#gTail)" stroke-width="26" stroke-linecap="round"/>
+<circle cx="334" cy="128" r="64" fill="#FF8A00" opacity=".7" filter="url(#fSoft)"/>
+<circle cx="334" cy="128" r="40" fill="url(#gOrange)"/>
+<circle cx="322" cy="114" r="14" fill="#fff" opacity=".85"/>
+<path d="M190.0 124.0 Q193.9 146.1 216.0 150.0 Q193.9 153.9 190.0 176.0 Q186.1 153.9 164.0 150.0 Q186.1 146.1 190.0 124.0Z" fill="#E0AAFF"/>
+<path d="M400.0 284.0 Q402.4 297.6 416.0 300.0 Q402.4 302.4 400.0 316.0 Q397.6 302.4 384.0 300.0 Q397.6 297.6 400.0 284.0Z" fill="#fff" opacity=".8"/>
+<rect x="16.5" y="16.5" width="479" height="479" rx="119.5" fill="none" stroke="#fff" stroke-opacity=".2"/>
+</svg>

@@ -1,0 +1,3 @@
+/* Claude app window: hide browser chrome so it feels like an app. */
+#TabsToolbar, #nav-bar, #PersonalToolbar, #sidebar-box { visibility: collapse !important; }
+#navigator-toolbox { border: 0 !important; }

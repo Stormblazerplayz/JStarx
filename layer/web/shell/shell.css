@@ -1,0 +1,49 @@
+/* StarShell surfaces (desktop, dock, island, overlay). Uses ../common/theme.css tokens. */
+html, body { background: transparent; width: 100%; height: 100%; }
+
+/* ---------- app icon tiles ---------- */
+.app {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; width: calc(var(--icon, 64px) + 28px);
+  border-radius: 18px; padding: 6px 0; position: relative;
+}
+.app .icon {
+  width: var(--icon, 64px); height: var(--icon, 64px); border-radius: 26%;
+  background-size: cover; background-position: center;
+  box-shadow: 0 12px 24px -10px rgba(8,0,24,.8);
+  transition: transform .35s var(--spring), filter .2s;
+}
+.app .icon img { width: 100%; height: 100%; display: block; border-radius: inherit; }
+.app:hover .icon { transform: translateY(-3px) scale(1.06); filter: brightness(1.08); }
+.app:active .icon { transform: scale(.9); }
+.app .label { font-size: 13px; font-weight: 600; color: #fff; text-shadow: 0 1px 6px rgba(10,0,30,.9);
+  max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+
+/* ---------- folders ---------- */
+.folder .icon {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10%;
+  padding: 14%; border-radius: 28%;
+  background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), rgba(40,10,80,.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 0 0 1px rgba(255,255,255,.22), inset 0 -10px 20px -12px rgba(255,138,0,.5), 0 14px 30px -12px rgba(8,0,24,.85);
+}
+.folder .icon img { width: 100%; height: 100%; border-radius: 24%; }
+.folder .icon .more { display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; background: rgba(255,255,255,.18); border-radius: 24%; }
+
+.badge { position: absolute; top: 0; right: 10px; min-width: 22px; height: 22px; border-radius: 11px; padding: 0 6px;
+  background: var(--o-500); color: #1A0A00; font-size: 12px; font-weight: 800; display: grid; place-items: center;
+  box-shadow: 0 4px 10px rgba(255,138,0,.5); }
+
+/* jiggle in edit mode */
+.editing .app .icon { animation: jiggle .28s ease-in-out infinite; }
+.editing .app:nth-child(2n) .icon { animation-delay: -.14s; }
+.remove-dot { position: absolute; top: -2px; left: 8px; width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(30,8,60,.92); color: #fff; display: grid; place-items: center; box-shadow: 0 0 0 1.5px rgba(255,255,255,.4); z-index: 2; }
+.remove-dot .ico { width: 14px; height: 14px; }
+
+/* ---------- menus ---------- */
+.menu { position: fixed; min-width: 210px; padding: 6px; border-radius: 16px; z-index: 50; }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; font-weight: 600; text-align: left; }
+.menu button:hover { background: rgba(255,255,255,.12); }
+.menu hr { border: 0; height: 1px; background: var(--line); margin: 4px 6px; }
+
+/* ---------- headings inside panels ---------- */
+.panel-title { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin: 0 0 10px 4px; }

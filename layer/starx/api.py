@@ -1,0 +1,358 @@
+"""Methods the web UI can call (StarX.call('group.name', {...}) -> Api.m_group_name)."""
+import json
+import os
+import shutil
+import subprocess
+import threading
+import time
+import urllib.error
+import urllib.request
+
+from . import apps, daemon, paths, system, wm
+from .bridge import open_external, threaded
+from .settings import Settings, load_home, save_home
+
+REPO = os.environ.get("JSTARX_REPO", "Stormblazerplayz/JStarx")
+
+
+class Api:
+    def __init__(self, role="app", app_id=None):
+        paths.ensure_user_dirs()
+        self.role = role
+        self.app_id = app_id
+        self.settings = Settings()
+        self.bridge = None
+        self._spark_streams = {}
+
+    # ------------------------------------------------------------------ settings
+    def m_settings_get(self, view=None):
+        return self.settings.get()
+
+    def m_settings_set(self, path, value, view=None):
+        return self.settings.set(path, value)
+
+    def m_settings_reset(self, view=None):
+        return self.settings.reset()
+
+    def m_settings_fixes(self, view=None):
+        return self.settings.fixes
+
+    # ------------------------------------------------------------------ apps
+    def m_apps_list(self, view=None):
+        return apps.all_apps()
+
+    def m_apps_launch(self, id, view=None):
+        rec = apps.find(id)
+        if not rec:
+            raise ValueError(f"no app called {id}")
+        open_ids = {w["app_id"] for w in wm.windows()}
+        if rec["app_id"] in open_ids and wm.focus(rec["app_id"]):
+            return {"focused": True}
+        res = apps.launch(rec)
+        if res is not True:
+            raise RuntimeError(f"could not start {rec['name']}: {res}")
+        return {"started": True}
+
+    def m_home_get(self, view=None):
+        return load_home()
+
+    def m_home_set(self, layout, view=None):
+        save_home(layout)
+        return True
+
+    def m_open_url(self, url, view=None):
+        if not str(url).startswith(("http://", "https://")):
+            raise ValueError("only web links can be opened")
+        return open_external(url)
+
+    # ------------------------------------------------------------------ system
+    def m_system_info(self, view=None):
+        info = system.static_info()
+        info["update"] = daemon.status("update")
+        return info
+
+    def m_system_stats(self, view=None):
+        return system.stats()
+
+    @threaded
+    def m_net_status(self, view=None):
+        return system.net_status()
+
+    @threaded
+    def m_net_wifi_list(self, rescan=False, view=None):
+        return system.wifi_list(rescan)
+
+    @threaded
+    def m_net_wifi_connect(self, ssid, password=None, view=None):
+        return system.wifi_connect(ssid, password)
+
+    @threaded
+    def m_net_wifi_radio(self, on, view=None):
+        return system.wifi_radio(bool(on))
+
+    @threaded
+    def m_audio_get(self, view=None):
+        return system.audio_get()
+
+    @threaded
+    def m_audio_set(self, volume=None, muted=None, view=None):
+        return system.audio_set(volume, muted)
+
+    @threaded
+    def m_display_get(self, view=None):
+        return {"outputs": system.outputs(), "backlight": system.backlight_get(), "casting": system.casting_available(),
+                "cast_status": daemon.status("cast")}
+
+    @threaded
+    def m_display_set(self, name, mode=None, scale=None, view=None):
+        return system.set_output(name, mode, scale)
+
+    def m_display_cast(self, view=None):
+        """Open the wireless display picker (Miracast and Chromecast)."""
+        if not system.casting_available():
+            raise RuntimeError("Screen casting is not installed")
+        subprocess.Popen(["gnome-network-displays"], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+
+    # ------------------------------------------------------------------ power + session
+    @threaded
+    def m_power_get(self, view=None):
+        try:
+            return daemon.starxd("power_get")
+        except daemon.DaemonError:
+            gov = system._read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
+            return {"profile": "balanced", "governor": gov or "unknown", "ai_247": False, "service": False}
+
+    @threaded
+    def m_power_set(self, profile, view=None):
+        return daemon.starxd("power_set", profile=profile)
+
+    @threaded
+    def m_power_ai247(self, on, view=None):
+        return daemon.starxd("ai247_set", on=bool(on))
+
+    def m_session_action(self, action, view=None):
+        cmds = {
+            "reboot": ["systemctl", "reboot"],
+            "poweroff": ["systemctl", "poweroff"],
+            "logout": ["labwc", "--exit"],
+        }
+        if action not in cmds:
+            raise ValueError("unknown action")
+        subprocess.Popen(cmds[action], start_new_session=True)
+        return True
+
+    # ------------------------------------------------------------------ updates + repair (root services)
+    def m_update_status(self, view=None):
+        st = daemon.status("update")
+        st.setdefault("current", {"layer": self._layer_version()})
+        return st
+
+    @staticmethod
+    def _layer_version():
+        try:
+            with open(os.path.join(paths.LAYER, "layer.json")) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    @threaded
+    def m_update_check(self, view=None):
+        return daemon.starxd("update_check", timeout=90)
+
+    @threaded
+    def m_update_apply(self, view=None):
+        return daemon.starxd("update_apply", timeout=600)
+
+    @threaded
+    def m_update_rollback(self, view=None):
+        return daemon.starxd("update_rollback", timeout=120)
+
+    @threaded
+    def m_update_config(self, auto=None, branch=None, view=None):
+        if auto is not None:
+            self.settings.set("updates.auto", bool(auto))
+        if branch:
+            self.settings.set("updates.branch", str(branch))
+        return daemon.starxd("update_config", auto=self.settings.get("updates.auto"), branch=self.settings.get("updates.branch"))
+
+    def m_repair_status(self, view=None):
+        st = daemon.status("repair")
+        st["settings_fixes"] = self.settings.fixes
+        return st
+
+    @threaded
+    def m_repair_run(self, mode="quick", view=None):
+        self.settings.data = self.settings.load()  # re-check (and fix) the user's settings too
+        res = daemon.starxd("repair_run", mode=mode, timeout=1800)
+        if isinstance(res, dict):
+            res["settings_fixes"] = self.settings.fixes
+        return res
+
+    @threaded
+    def m_storage_clean(self, view=None):
+        return daemon.starxd("storage_clean", timeout=1800)
+
+    @threaded
+    def m_system_set(self, key, value, view=None):
+        if key not in ("timezone", "hostname", "autologin", "ssh"):
+            raise ValueError("unknown system setting")
+        return daemon.starxd("system_set", key=key, value=value)
+
+    # ------------------------------------------------------------------ Star Store
+    def _catalog_local(self):
+        for base in (os.path.join(paths.LAYER, "store"), os.path.join(paths.LAYER, "..", "store")):
+            p = os.path.join(base, "catalog.json")
+            if os.path.exists(p):
+                with open(p) as f:
+                    return json.load(f), base
+        return {"apps": []}, None
+
+    @threaded
+    def m_store_catalog(self, refresh=False, view=None):
+        catalog, _ = self._catalog_local()
+        if refresh:
+            url = f"https://raw.githubusercontent.com/{REPO}/{self.settings.get('updates.branch')}/store/catalog.json"
+            try:
+                with urllib.request.urlopen(url, timeout=12) as r:
+                    catalog = json.load(r)
+            except (OSError, ValueError, urllib.error.URLError):
+                pass  # offline: keep the bundled catalog
+        installed = {a["id"]: a for a in apps.all_apps() if not a.get("builtin")}
+        for a in catalog.get("apps", []):
+            a["installed"] = a["id"] in installed
+            a["icon_url"] = "file://" + os.path.join(paths.WEB, "icons", a.get("icon", "box") + ".svg")
+        return catalog
+
+    @threaded
+    def m_store_install(self, id, view=None):
+        from . import store
+        catalog, base = self._catalog_local()
+        entry = next((a for a in catalog.get("apps", []) if a["id"] == id), None)
+        if not entry:
+            raise ValueError("app not in the catalog")
+        progress = lambda text, pct=None: self.bridge.emit_threadsafe("store-progress", {"id": id, "text": text, "pct": pct})
+        result = store.install(entry, base, self.settings.get("updates.branch"), REPO, progress)
+        self.bridge.emit_threadsafe("apps-changed", None)
+        _notify_shell("apps-changed")
+        return result
+
+    @threaded
+    def m_store_uninstall(self, id, view=None):
+        from . import store
+        result = store.uninstall(id)
+        _notify_shell("apps-changed")
+        return result
+
+    # ------------------------------------------------------------------ AI (StarAI daemon)
+    @threaded
+    def m_ai_status(self, view=None):
+        try:
+            return daemon.starai("status")
+        except daemon.DaemonError as e:
+            st = daemon.status("ai")
+            st.setdefault("jobs", [])
+            st["offline"] = str(e)
+            return st
+
+    @threaded
+    def m_ai_templates(self, view=None):
+        return daemon.starai("templates")
+
+    @threaded
+    def m_ai_create(self, job, view=None):
+        return daemon.starai("create", job=job)
+
+    @threaded
+    def m_ai_action(self, id, action, view=None):
+        return daemon.starai("action", id=id, action=action)
+
+    @threaded
+    def m_ai_log(self, id, lines=200, view=None):
+        return daemon.starai("log", id=id, lines=lines)
+
+    # ------------------------------------------------------------------ Spark 1
+    @threaded
+    def m_spark_status(self, view=None):
+        st = daemon.status("spark")
+        try:
+            with urllib.request.urlopen(paths.SPARK_URL + "/health", timeout=2) as r:
+                st["engine"] = json.load(r).get("status", "ok")
+        except Exception:
+            st["engine"] = "offline"
+        return st
+
+    @threaded
+    def m_spark_download(self, url=None, view=None):
+        return daemon.starxd("spark_download", url=url or self.settings.get("spark.model_url"), timeout=30)
+
+    @threaded
+    def m_spark_import(self, path, view=None):
+        return daemon.starxd("spark_import", path=path, timeout=600)
+
+    @threaded
+    def m_spark_service(self, action, view=None):
+        return daemon.starxd("spark_service", action=action)
+
+    def m_spark_chat(self, messages, view=None):
+        """Stream an answer from Spark 1. Sends 'spark-token' events, then 'spark-done'."""
+        req = f"r{int(time.time() * 1000)}"
+        stop = threading.Event()
+        self._spark_streams[req] = stop
+        system_prompt = self.settings.get("spark.personality")
+        body = {"messages": [{"role": "system", "content": system_prompt}] + list(messages)[-20:],
+                "stream": True, "temperature": 0.7, "max_tokens": 512}
+
+        def work():
+            err = None
+            try:
+                rq = urllib.request.Request(paths.SPARK_URL + "/v1/chat/completions", data=json.dumps(body).encode(),
+                                            headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(rq, timeout=300) as r:
+                    for raw in r:
+                        if stop.is_set():
+                            break
+                        line = raw.decode("utf-8", "replace").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            delta = json.loads(data)["choices"][0].get("delta", {}).get("content")
+                        except (ValueError, KeyError, IndexError):
+                            delta = None
+                        if delta:
+                            self.bridge.emit_threadsafe("spark-token", {"req": req, "text": delta}, [view])
+            except Exception as e:
+                err = "Spark 1 isn't running yet. Install the Spark 1 model in Settings → AI & Spark." \
+                    if isinstance(e, (urllib.error.URLError, ConnectionError, OSError)) else str(e)
+            self.bridge.emit_threadsafe("spark-done", {"req": req, "error": err}, [view])
+            self._spark_streams.pop(req, None)
+
+        threading.Thread(target=work, daemon=True).start()
+        return {"req": req}
+
+    def m_spark_stop(self, req, view=None):
+        ev = self._spark_streams.get(req)
+        if ev:
+            ev.set()
+        return True
+
+
+def _notify_shell(command):
+    """Tell the running shell something changed (installed apps, settings...)."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(2)
+        s.connect(paths.SHELL_SOCKET)
+        s.sendall((command + "\n").encode())
+        s.close()
+    except OSError:
+        pass
+
+
+def which(cmd):
+    return shutil.which(cmd) is not None

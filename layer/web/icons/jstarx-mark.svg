@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+  <linearGradient id="gStar" x1=".15" y1=".05" x2=".85" y2=".95">
+    <stop offset="0" stop-color="#E0AAFF"/><stop offset=".42" stop-color="#B15CFF"/>
+    <stop offset=".74" stop-color="#FF8A3D"/><stop offset="1" stop-color="#FFD166"/>
+  </linearGradient>
+  <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C77DFF"/><stop offset=".5" stop-color="#9D4EDD"/><stop offset="1" stop-color="#5A189A"/>
+  </linearGradient>
+  <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFD166"/><stop offset=".55" stop-color="#FF8A00"/><stop offset="1" stop-color="#F25C05"/>
+  </linearGradient>
+  <linearGradient id="gSpec" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".48" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#3C096C"/><stop offset=".55" stop-color="#240046"/><stop offset="1" stop-color="#10002B"/>
+  </linearGradient>
+  <radialGradient id="gGlowP" cx=".2" cy=".15" r=".75">
+    <stop offset="0" stop-color="#C77DFF" stop-opacity=".55"/><stop offset="1" stop-color="#C77DFF" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="gGlowO" cx=".82" cy=".88" r=".65">
+    <stop offset="0" stop-color="#FF8A00" stop-opacity=".55"/><stop offset="1" stop-color="#FF8A00" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="fShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0B0018" flood-opacity=".55"/>
+  </filter>
+  <filter id="fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="fBlur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<path d="M256.0 20.0 Q286.7 225.3 492.0 256.0 Q286.7 286.7 256.0 492.0 Q225.3 286.7 20.0 256.0 Q225.3 225.3 256.0 20.0Z" fill="url(#gStar)"/><path d="M256.0 20.0 Q286.7 225.3 492.0 256.0 Q286.7 286.7 256.0 492.0 Q225.3 286.7 20.0 256.0 Q225.3 225.3 256.0 20.0Z" fill="url(#gSpec)"/>
+</svg>

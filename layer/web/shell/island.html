@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>JStarx Island</title>
+<link rel="stylesheet" href="../common/theme.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  body { overflow: hidden; }
+  #island { position: absolute; top: 8px; left: 0; right: 0; margin: 0 auto; height: 38px; width: 236px;
+    border-radius: 22px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 10px; overflow: hidden;
+    transition: width .55s var(--spring), height .55s var(--spring), border-radius .5s var(--spring), transform .35s var(--spring);
+    background-color: rgba(16, 2, 36, .78); cursor: pointer; }
+  #island:hover { transform: scale(1.035); }
+  #island:active { transform: scale(.97); }
+  #island .logo { width: 20px; height: 20px; flex: none; }
+  #island .logo.busy { animation: spin 3.5s linear infinite; }
+  .time { font-weight: 750; font-size: 15px; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+  .icons { margin-left: auto; display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .icons .ico { width: 17px; height: 17px; }
+  .act { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--o-200); white-space: nowrap; }
+  .act svg.prog { width: 18px; height: 18px; transform: rotate(-90deg); }
+  .mode { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px 0 10px; gap: 10px;
+    opacity: 0; transform: scale(.92); transition: opacity .25s, transform .45s var(--spring); pointer-events: none; }
+  .mode.on { opacity: 1; transform: none; pointer-events: auto; }
+  #compact { position: static; opacity: 1; transform: none; padding: 0; width: 100%; }
+  #compact.off { opacity: 0; transform: scale(.9); position: absolute; }
+  /* notification card */
+  #note { padding: 14px 16px; align-items: flex-start; gap: 14px; }
+  #note .nicon { width: 44px; height: 44px; border-radius: 12px; flex: none; display: grid; place-items: center; color: #fff;
+    background: var(--accent-grad); }
+  #note .nicon .ico { width: 24px; height: 24px; }
+  #note .napp { font-size: 12px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+  #note .nsum { font-weight: 750; font-size: 15px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #note .nbody { font-size: 13.5px; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* OSD */
+  #osd .meter { flex: 1; height: 7px; }
+  #osd .ico { width: 20px; height: 20px; }
+  #osd .pct { font-weight: 750; width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="island" class="glass" role="button" aria-label="Dynamic island: open Control Center">
+  <div id="compact" class="mode on">
+    <img class="logo" id="logo" alt="">
+    <span class="time" id="time">--:--</span>
+    <span class="act" id="act"></span>
+    <span class="icons" id="icons"></span>
+  </div>
+  <div id="note" class="mode"></div>
+  <div id="osd" class="mode"></div>
+</div>
+<script src="../common/starx.js"></script>
+<script src="common.js"></script>
+<script src="island.js"></script>
+</body>
+</html>

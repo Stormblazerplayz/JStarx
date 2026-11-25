@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<defs>
+  <linearGradient id="gStar" x1=".15" y1=".05" x2=".85" y2=".95">
+    <stop offset="0" stop-color="#E0AAFF"/><stop offset=".42" stop-color="#B15CFF"/>
+    <stop offset=".74" stop-color="#FF8A3D"/><stop offset="1" stop-color="#FFD166"/>
+  </linearGradient>
+  <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#C77DFF"/><stop offset=".5" stop-color="#9D4EDD"/><stop offset="1" stop-color="#5A189A"/>
+  </linearGradient>
+  <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFD166"/><stop offset=".55" stop-color="#FF8A00"/><stop offset="1" stop-color="#F25C05"/>
+  </linearGradient>
+  <linearGradient id="gSpec" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".48" stop-color="#fff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="gBg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#3C096C"/><stop offset=".55" stop-color="#240046"/><stop offset="1" stop-color="#10002B"/>
+  </linearGradient>
+  <radialGradient id="gGlowP" cx=".2" cy=".15" r=".75">
+    <stop offset="0" stop-color="#C77DFF" stop-opacity=".55"/><stop offset="1" stop-color="#C77DFF" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="gGlowO" cx=".82" cy=".88" r=".65">
+    <stop offset="0" stop-color="#FF8A00" stop-opacity=".55"/><stop offset="1" stop-color="#FF8A00" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="fShadow" x="-30%" y="-30%" width="160%" height="160%">
+    <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0B0018" flood-opacity=".55"/>
+  </filter>
+  <filter id="fSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="fBlur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+
+<defs><radialGradient id="gPlanet" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#E0AAFF"/><stop offset=".45" stop-color="#8E3BEA"/><stop offset="1" stop-color="#240046"/></radialGradient></defs>
+<g transform="rotate(-20 256 256)"><ellipse cx="256" cy="256" rx="232" ry="64" fill="none" stroke="url(#gOrange)" stroke-width="22" opacity=".45"/></g>
+<circle cx="256" cy="256" r="134" fill="url(#gPlanet)" filter="url(#fShadow)"/>
+<ellipse cx="214" cy="196" rx="70" ry="42" fill="#fff" opacity=".28" filter="url(#fBlur6)" transform="rotate(-30 214 196)"/>
+<g transform="rotate(-20 256 256)"><path d="M24 256 A232 64 0 0 0 488 256" fill="none" stroke="url(#gOrange)" stroke-width="22" stroke-linecap="round"/>
+<path d="M60 268 A200 50 0 0 0 300 316" fill="none" stroke="#fff" stroke-opacity=".4" stroke-width="5" stroke-linecap="round"/></g>
+<path d="M408.0 56.0 Q414.0 90.0 448.0 96.0 Q414.0 102.0 408.0 136.0 Q402.0 102.0 368.0 96.0 Q402.0 90.0 408.0 56.0Z" fill="#FFD166"/>
+<path d="M96.0 398.0 Q99.3 416.7 118.0 420.0 Q99.3 423.3 96.0 442.0 Q92.7 423.3 74.0 420.0 Q92.7 416.7 96.0 398.0Z" fill="#E0AAFF"/>
+</svg>

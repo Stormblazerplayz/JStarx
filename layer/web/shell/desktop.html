@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>JStarx Desktop</title>
+<link rel="stylesheet" href="../common/theme.css">
+<link rel="stylesheet" href="shell.css">
+<style>
+  #wall { position: fixed; inset: 0; background: var(--wall) center / cover no-repeat; transition: opacity .6s var(--ease); }
+  #home { position: fixed; inset: 64px 48px 118px 48px; display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 48px; }
+  .widgets { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+  .widget { padding: 20px 22px; border-radius: 26px; }
+  .today .greet { font-size: 16px; font-weight: 600; color: var(--text-2); }
+  .today .big { font-size: 64px; font-weight: 750; letter-spacing: -.035em; line-height: 1.05; margin: 4px 0 2px;
+    background: linear-gradient(180deg, #fff, #E9D6FF); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .today .date { font-size: 16px; color: var(--text-2); }
+  .spark-w .head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .spark-w .head img { width: 40px; height: 40px; }
+  .spark-w .name { font-weight: 750; font-size: 17px; }
+  .spark-w form { display: flex; gap: 8px; }
+  .spark-w .field { flex: 1; height: 42px; border-radius: 14px; }
+  .sys-w .rings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ring { display: grid; justify-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); font-weight: 600; }
+  .ring svg { width: 70px; height: 70px; transform: rotate(-90deg); }
+  .ring .v { position: relative; margin-top: -54px; height: 38px; font-size: 15px; font-weight: 800; color: var(--text); }
+  .sys-w .ai-line { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-2); }
+
+  .grid { align-self: center; justify-self: center; display: grid; grid-template-columns: repeat(var(--cols, 4), auto);
+    gap: 34px 44px; --icon: 104px; }
+  .grid .app .label { font-size: 15px; }
+
+  #folder-layer { position: fixed; inset: 0; z-index: 20; }
+  body { background: #14032E; }
+  #folder-layer .backdrop { position: absolute; inset: 0; background: rgba(14, 2, 34, .45);
+    backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%); }
+  .fcenter { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .fpanel { width: min(680px, 86vw); border-radius: 36px; padding: 26px 28px 30px; pointer-events: auto; }
+  .fpanel h2 { margin: 0 0 18px; font-size: 26px; font-weight: 750; text-align: center; }
+  .fpanel h2 input { width: 100%; text-align: center; font: inherit; color: inherit; background: rgba(255,255,255,.08);
+    border: 0; border-radius: 12px; padding: 4px 10px; outline: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+  .fgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 10px; justify-items: center; --icon: 76px; }
+  .fpanel .tools { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+  .picker { margin-top: 14px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; max-height: 240px; --icon: 52px; }
+  .picker .app .label { font-size: 11.5px; }
+
+  #edit-bar { position: fixed; left: 50%; top: 66px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center;
+    gap: 12px; padding: 8px 8px 8px 18px; border-radius: 99px; font-weight: 650; }
+  .dragging { opacity: .35; }
+  .ghost { position: fixed; pointer-events: none; z-index: 60; transform: scale(1.08); filter: drop-shadow(0 16px 24px rgba(0,0,0,.5)); }
+  .drop-target .icon { box-shadow: 0 0 0 3px var(--o-400), 0 14px 30px -12px rgba(8,0,24,.85) !important; }
+
+  @media (max-width: 1100px) { #home { grid-template-columns: 280px 1fr; gap: 28px; inset: 60px 28px 112px 28px; } .grid { --icon: 88px; gap: 26px 30px; } .today .big { font-size: 52px; } }
+  @media (max-height: 760px) { .sys-w { display: none; } }
+</style>
+</head>
+<body>
+<div id="wall"></div>
+<main id="home">
+  <section class="widgets">
+    <div class="glass fixed-bg widget today">
+      <div class="greet" id="greet">Hello</div>
+      <div class="big" id="clock">--:--</div>
+      <div class="date" id="date"></div>
+    </div>
+    <div class="glass fixed-bg widget spark-w">
+      <div class="head"><img id="spark-img" alt=""><div class="grow"><div class="name">Spark 1</div><div class="faint" id="spark-state" style="font-size:13px">Checking…</div></div></div>
+      <form id="spark-form"><input class="field" id="spark-q" placeholder="Ask Spark anything…" autocomplete="off"><button class="btn primary" aria-label="Ask">⏎</button></form>
+    </div>
+    <div class="glass fixed-bg widget sys-w">
+      <div class="panel-title">This Jetson</div>
+      <div class="rings" id="rings"></div>
+      <div class="ai-line" id="ai-line"></div>
+    </div>
+  </section>
+  <section class="grid" id="grid"></section>
+</main>
+<div id="folder-layer" class="hidden"><div class="backdrop"></div><div class="fcenter"></div></div>
+<div id="edit-bar" class="glass strong fixed-bg hidden">Editing home screen
+  <button class="btn small" id="new-folder">New folder</button>
+  <button class="btn small primary" id="edit-done">Done</button>
+</div>
+<script src="../common/starx.js"></script>
+<script src="common.js"></script>
+<script src="desktop.js"></script>
+</body>
+</html>

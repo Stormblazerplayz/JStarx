@@ -1,0 +1,6 @@
+#!/bin/sh
+# Runs starx.ctl from the active JStarx layer.
+LAYER="${JSTARX_LAYER:-$(dirname "$(dirname "$(readlink -f "$0")")")}"
+export JSTARX_LAYER="$LAYER"
+export PYTHONPATH="$LAYER${PYTHONPATH:+:$PYTHONPATH}"
+exec "${STARX_PYTHON:-python3}" -m starx.ctl "$@"
