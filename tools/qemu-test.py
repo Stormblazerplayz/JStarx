@@ -136,7 +136,7 @@ def _connect(path):
 
 
 class Machine:
-    def __init__(self, image, out, memory=4096, cpus=4):
+    def __init__(self, image, out, memory=4096, cpus=4, display=True):
         self.out = out
         self.disk = os.path.join(out, "disk.qcow2")
         if os.path.exists(self.disk):
@@ -155,7 +155,7 @@ class Machine:
             "qemu-system-aarch64", "-M", "virt", "-cpu", "cortex-a57", "-smp", str(cpus), "-m", str(memory),
             "-accel", "tcg,thread=multi", "-bios", uboot,
             "-drive", f"if=none,id=hd0,file={self.disk},format=qcow2", "-device", "virtio-blk-pci,drive=hd0",
-            "-device", "virtio-gpu-pci,xres=1280,yres=720",
+            *(["-device", "virtio-gpu-pci,xres=1280,yres=720"] if display else []),
             "-device", "qemu-xhci", "-device", "usb-kbd", "-device", "usb-tablet",
             "-netdev", "user,id=n0", "-device", "virtio-net-pci,netdev=n0",
             "-device", "i6300esb", "-action", "watchdog=reset",
@@ -202,7 +202,9 @@ class Machine:
         self.n += 1
         tag = f"_JX{self.n}_"
         m = self.serial.mark()
-        self.serial.send(f"{cmd}\necho {tag}$?{tag}\n")
+        # one line, so nothing is typed ahead while a command runs (sudo would swallow it)
+        sep = " " if cmd.rstrip().endswith("&") else " ; "
+        self.serial.send(f"{cmd}{sep}echo {tag}$?{tag}\n")
         r = self.serial.wait(rf"{tag}(\d+){tag}", timeout, m)
         out = self.serial.text(m)[: r.start()].replace("\r", "").strip("\n")
         code = int(r.group(1))
@@ -287,6 +289,7 @@ def main():
     ap.add_argument("image")
     ap.add_argument("--out", default=os.path.join(ROOT, "test-out"))
     ap.add_argument("--skip-reboot-test", action="store_true")
+    ap.add_argument("--no-display", action="store_true", help="start with no screen: JStarx should look for a wireless display")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for f in ("serial.log", "report.md"):
@@ -295,9 +298,9 @@ def main():
     shutil.rmtree(os.path.join(args.out, "boot-frames"), ignore_errors=True)
 
     rep = Report(args.out)
-    vm = Machine(args.image, args.out)
+    vm = Machine(args.image, args.out, display=not args.no_display)
     try:
-        run_tests(vm, rep, args)
+        (run_no_display_tests if args.no_display else run_tests)(vm, rep, args)
     except Exception as e:
         rep.check("test run finished", False, f"{type(e).__name__}: {e}")
         try:
@@ -309,6 +312,28 @@ def main():
         ok = rep.write()
     print(open(os.path.join(args.out, "report.md")).read())
     sys.exit(0 if ok else 1)
+
+
+def run_no_display_tests(vm, rep, args):
+    """No screen plugged in: the desktop runs on a virtual screen and StarCast looks for a TV."""
+    t0 = time.time()
+    vm.serial.wait(r"jstarx login: ", 1500)
+    rep.check("Starts with no screen plugged in", True, f"{int(time.time() - t0)}s")
+    vm.login()
+    try:
+        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
+        rep.check("Desktop runs on a virtual screen", True)
+    except Timeout as e:
+        rep.check("Desktop runs on a virtual screen", False, str(e))
+        vm.sh("tail -30 /run/user/1000/jstarx/session.log")
+    code, env = vm.sh("P=$(pgrep -u storm -f 'starx.shell' | head -1); tr '\\0' '\\n' < /proc/$P/environ | grep -E 'STARX_HEADLESS|WLR_BACKENDS'")
+    rep.check("Session knows there is no screen", "STARX_HEADLESS=1" in env, env.strip().replace("\n", " "))
+    try:
+        out = vm.wait_sh("grep -E '\"state\": \"(searching|none-found|starting|casting)\"' /run/user/1000/jstarx/cast.json", 600, every=10)
+        rep.check("StarCast looks for a wireless display by itself", True, out.strip()[:200])
+    except Timeout as e:
+        _, cast = vm.sh("cat /run/user/1000/jstarx/cast.json; pgrep -af starcast")
+        rep.check("StarCast looks for a wireless display by itself", False, cast[:200])
 
 
 def run_tests(vm, rep, args):

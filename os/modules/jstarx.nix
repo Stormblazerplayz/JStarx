@@ -78,6 +78,11 @@ in
     themePackages = [ J.jstarx-plymouth ];
     font = "${pkgs.inter}/share/fonts/truetype/InterVariable.ttf";
   };
+  # Plymouth only uses a graphics card that udev has finished setting up. Without this wait it
+  # can look too early, miss the card and show text instead of the boot screen.
+  boot.initrd.systemd.services.plymouth-start.preStart = lib.mkAfter ''
+    udevadm settle --timeout=15 || true
+  '';
 
   # ------------------------------------------------------------------ users
   users.groups.jstarx = { };

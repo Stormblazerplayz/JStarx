@@ -1,11 +1,18 @@
 # Builds the JStarx OS SD card image for the Jetson Nano.
-# Run it from the Actions tab ("Run workflow"), or push a tag like v1.0.0 to also publish a release.
+# Runs for pull requests, from the Actions tab ("Run workflow"), or when a tag like v1.0.0 is pushed
+# (then it also publishes a release). Download the image from the run's "Artifacts".
 name: Build JStarx OS image
 
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+  pull_request:
+    paths: ["os/**", "layer/**", "default.nix", ".github/workflows/build-image.yml"]
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -35,7 +42,7 @@ jobs:
 
       - name: Run the JStarx tests
         run: |
-          nix-shell -p 'python3.withPackages (ps: [ ps.pytest ps.numpy ])' --run 'python -m pytest -q tests'
+          nix-shell -E 'with import (import ./os/nixpkgs.nix) {}; mkShell { packages = [ (python3.withPackages (ps: [ ps.pytest ps.numpy ])) ]; }' --run 'python -m pytest -q tests'
 
       - name: Build the SD card image (StarX Kernel + JStarx OS)
         run: nix-build -A sdImage -o result-sd
