@@ -293,6 +293,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "test-out"))
     ap.add_argument("--skip-reboot-test", action="store_true")
     ap.add_argument("--no-display", action="store_true", help="start with no screen: JStarx should look for a wireless display")
+    ap.add_argument("--repair-only", action="store_true", help="only boot, then run the auto-repair tests")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for f in ("serial.log", "report.md"):
@@ -351,6 +352,10 @@ def run_tests(vm, rep, args):
     rep.check("JStarx boot screen is shown", score > 2000, f"frame {best}, colour score {score}")
 
     vm.login()
+    if args.repair_only:
+        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
+        rep.check("StarShell desktop started", True)
+        return run_repair_tests(vm, rep, args)
     # ---------------------------------------------------------------- 2. system
     _, kernel = vm.sh("uname -r; cat /proc/version")
     rep.check("Runs the StarX Kernel", "6.12.118-starx" in kernel and "1-StarX" in kernel, kernel.splitlines()[0] if kernel else "")
@@ -415,6 +420,11 @@ def run_tests(vm, rep, args):
     vm.monitor.screenshot(os.path.join(out, "firefox.png"))
     vm.sh("pkill -f firefox || true")
 
+    run_repair_tests(vm, rep, args)
+
+
+def run_repair_tests(vm, rep, args):
+    out = args.out
     # ---------------------------------------------------------------- 5. auto-repair: damaged files
     code, upd = vm.sh("jstarx-update apply /etc/jstarx/factory-layer", 900)
     rep.check("Updater installs a layer into slot A", '"updated"' in upd, upd[-200:])
@@ -424,7 +434,7 @@ def run_tests(vm, rep, args):
     rep.check("Auto-repair fixes damaged and missing files", code2 == 0 and "Restored" in fix, " ".join(re.findall(r"Restored [^\"]+", fix))[:200])
 
     # ---------------------------------------------------------------- 6. auto-repair: crashing desktop
-    vm.sh("systemctl restart greetd")
+    vm.sh("rm -f /run/greetd.run; systemctl restart greetd")  # greetd only auto-logs in once per boot otherwise
     try:
         vm.wait_sh("P=$(pgrep -u storm -f 'starx.shell' | head -1) && tr '\\0' '\\n' < /proc/$P/environ | grep -q 'JSTARX_LAYER=/var/lib/jstarx/layers/a'", 1500, every=15)
         on_a = True
