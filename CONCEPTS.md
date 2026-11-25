@@ -110,3 +110,22 @@ Then, if you want AI and CUDA, **StarLinux** can come later as version 2.
 - I can't download NVIDIA's files from this cloud computer, so Concepts 2 and 3 would have to be built on your own PC.
 - I can't test on a real Jetson Nano from here. StarKernel gets tested in QEMU, and the Nano-specific parts (UART address, screen) need a check on your board.
 - A Jetson Nano starts with the NVIDIA bootloaders, so those stay. Everything after U-Boot can be ours.
+
+---
+
+## 5 more concepts from StarLinux (Concept 2)
+
+Same base (our own Linux, fast boot, GPU/CUDA), but each one is made for a different kind of person.
+Pictures are in the `concepts/` folder.
+
+| # | Name | For who | Main idea |
+|---|---|---|---|
+| 2A | **StarLinux Dev** | Coders | Code editor, terminal and a live GPU monitor built in. One command, `jstar run`, runs your code. |
+| 2B | **StarLinux Learn** | Kids learning to code | Drag-and-drop blocks that turn into real Python. Lessons, levels and a star to program. |
+| 2C | **StarLinux Arcade** | Gamers | Console mode. Big game tiles, controller support, press PLAY. |
+| 2D | **StarLinux Maker** | Robot and electronics builders | See all 40 pins live, read sensors, control LEDs, servos and motors. |
+| 2E | **StarLinux Themes** | Anyone who likes to customize | Pick or build a theme (Nebula, Sunrise, Mono, Retro). Share themes as files. |
+
+Notes:
+- These are mockups. The `jstar` commands and the pin colors are simplified ideas, not final.
+- They can all live in one OS as "modes" you pick on first boot.
