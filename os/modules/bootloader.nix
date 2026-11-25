@@ -56,6 +56,9 @@ in
       [ -n "$tries" ] || tries=0
       tries=$((tries + 1))
       echo "$tries" > "$J/tries"
+      # write it to the card right now: a broken build can crash seconds later, before the
+      # normal write-back, and then the try would never be counted (found by the QEMU test)
+      sync
       good="$(cat "$J/known-good" 2>/dev/null | tr -cd 0-9)"
       echo "<6>JStarx: starting build ''${gen:-?} (try $tries, last working build: ''${good:-none})" > /dev/kmsg
       if [ -n "$gen" ] && [ -n "$good" ] && [ "$gen" != "$good" ] && [ "$tries" -ge 3 ] && [ -f "$conf" ]; then

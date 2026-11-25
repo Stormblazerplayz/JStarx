@@ -294,6 +294,7 @@ def main():
     ap.add_argument("--skip-reboot-test", action="store_true")
     ap.add_argument("--no-display", action="store_true", help="start with no screen: JStarx should look for a wireless display")
     ap.add_argument("--repair-only", action="store_true", help="only boot, then run the auto-repair tests")
+    ap.add_argument("--fallback-only", action="store_true", help="only boot, then test going back from a broken build")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for f in ("serial.log", "report.md"):
@@ -371,6 +372,10 @@ def run_tests(vm, rep, args):
         rep.check("StarShell desktop started", True)
         snapshot_resources(vm, rep, args.out)
         return run_repair_tests(vm, rep, args)
+    if args.fallback_only:
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 1500, every=15)
+        rep.check("StarShell desktop started", True)
+        return run_fallback_test(vm, rep, args)
     # ---------------------------------------------------------------- 2. system
     _, kernel = vm.sh("uname -r; cat /proc/version")
     rep.check("Runs the StarX Kernel", "6.12.118-starx" in kernel and "1-StarX" in kernel, kernel.splitlines()[0] if kernel else "")
@@ -480,6 +485,11 @@ def run_repair_tests(vm, rep, args):
 
     if args.skip_reboot_test:
         return
+    run_fallback_test(vm, rep, args)
+
+
+def run_fallback_test(vm, rep, args):
+    out = args.out
     # ---------------------------------------------------------------- 7. auto-repair: broken system build
     vm.wait_sh("[ \"$(cat /boot/jstarx/known-good 2>/dev/null)\" = 1 ]", 900, every=15)
     rep.check("Build 1 is marked as working", True)
