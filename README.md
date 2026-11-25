@@ -15,18 +15,19 @@ animations, and it is built to run AI 24/7.
 |---|---|
 | **Desktop (StarShell)** | Dock at the bottom, Dynamic Island at the top, Start menu, Launchpad with pages, home screen with app folders, Control Center, notifications, spring/bounce animations everywhere |
 | **Boot screen** | JStarx logo that bounces in, glow, progress bar (Plymouth), plus the StarX logo in the kernel |
-| **Settings** | 15 pages: Wi-Fi, Display & Casting, Appearance, Dock & Island, Home & Launchpad, Sound, Power, AI & Spark, Apps, Updates, Repair, Storage, Users & Privacy, Date & Time, About |
+| **Settings** | 16 pages: Wi-Fi, Display & Casting, Appearance, Dock & Island, Home & Launchpad, Sound, Power, AI & Spark, Apps, Updates, Repair, Memory, Storage, Users & Privacy, Date & Time, About |
 | **Apps** | Firefox, Claude, Spark 1 (assistant), AI Center, Star Store, Terminal |
 | **Games** | Snake, Dodge, Breaker |
 | **Star Store** | Official JStarx apps you can install later: Notes, Paint, Calculator, Clock, Claude Code, AI Kit (PyTorch + Jupyter), VSCodium, Files, GIMP, VLC |
 | **24/7 AI** | AI Center runs training/serving jobs as system services, keeps them going after a restart, pauses them when the Jetson gets too hot, and has an "AI 24/7" mode that never sleeps |
 | **Spark 1** | Your own assistant model, run by llama.cpp on the Jetson (see below) |
-| **Auto update** | Checks this GitHub repo every few hours and installs the new JStarx layer into a spare slot (A/B), with a safety check of every file |
+| **Auto update** | Checks this GitHub repo every few hours: installs the new JStarx layer into a spare slot (A/B, every file checked), and whole-system updates (StarX Kernel, drivers, apps) that GitHub Actions publishes as `system-N` releases |
 | **Auto repair** | Fixes damaged files at every start, undoes an update if the desktop keeps crashing, Safe Mode, and goes back to the last working system if a new one can't start |
 | **Wireless display** | Cast the screen to a Miracast TV or a Chromecast; with no screen plugged in, JStarx finds a wireless display by itself |
-| **Full-screen apps** | Apps open full screen; JStarx apps' title bars curve around the Dynamic Island, and hovering the island opens it |
+| **Full-screen apps** | Apps open full screen; the title bars of JStarx apps and Firefox curve around the Dynamic Island, and hovering the island opens it (Today and Memory tabs) |
 | **Up to 12 GB memory** | 4 GB RAM + a swap file of up to 8 GB (a quarter of the card: 32 GB cards get the full 8 GB); idle app memory moves to compressed RAM, then to the swap file, so RAM stays free. Settings → Memory and the island's Memory tab show it |
-| **Power saving** | Power modes (Saver / Balanced / Performance), screen dimming and screen off, CPU limits, compressed memory (zram) |
+| **Power modes** | Low power, Power saver, Balanced, Performance and Extreme (everything at full speed, fan at max); screen dimming and screen off; zram |
+| **Fan** | The StarX Kernel drives the Nano's fan from the temperature; Settings → Power → Fan: Auto or Max |
 
 No bloatware: the system only has what JStarx needs. Everything else is in the Star Store.
 
@@ -36,7 +37,7 @@ You need: a Jetson Nano Developer Kit, a microSD card (32 GB or bigger is best),
 
 1. **Get the image.** Open the **Actions** tab of this repo, pick **Build JStarx OS image**, press
    **Run workflow**, wait for it to finish (about an hour), and download `jstarx-sd-image`.
-   (Releases also have it when a version tag is pushed.) You get `jstarx-1.0.0-jetson-nano.img.xz`.
+   (Releases also have it when a version tag is pushed.) You get `jstarx-2.0.0-jetson-nano.img.xz`.
 2. **Flash it.** Open [balenaEtcher](https://etcher.balena.io), pick the `.img.xz` file, pick your
    SD card, press **Flash**.
 3. **Start it.** Put the card in the Jetson, plug in a screen (or don't, see below), keyboard,
@@ -50,6 +51,9 @@ The first start takes a bit longer because JStarx grows to fill your whole SD ca
 > **If the Jetson doesn't start JStarx:** its built-in bootloader may be too old. Flash NVIDIA's
 > JetPack 4.6 SD card image once, start it and let it finish setting up (this updates the
 > bootloader inside the Jetson), then flash JStarx again.
+
+> **ISO file?** The Jetson Nano starts from an SD card image (`.img`, here `.img.xz`), not an `.iso`.
+> An ISO is for PCs and would not start on a Jetson. Flash the `.img.xz` with balenaEtcher.
 
 ## Spark 1 (the assistant)
 
@@ -99,7 +103,7 @@ and add `extra-platforms = aarch64-linux` to `/etc/nix/nix.conf`.
 Test the image in QEMU (needs `qemu-system-aarch64` and the `u-boot-qemu` package):
 
 ```bash
-python3 tools/qemu-test.py result-sd/sd-image/jstarx-1.0.0-jetson-nano.img
+python3 tools/qemu-test.py result-sd/sd-image/jstarx-2.0.0-jetson-nano.img
 ```
 
 Run the unit tests:

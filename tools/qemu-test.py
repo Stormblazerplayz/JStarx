@@ -339,12 +339,12 @@ def run_no_display_tests(vm, rep, args):
     rep.check("Starts with no screen plugged in", True, f"{int(time.time() - t0)}s")
     vm.login()
     try:
-        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 1500, every=15)
         rep.check("Desktop runs on a virtual screen", True)
     except Timeout as e:
         rep.check("Desktop runs on a virtual screen", False, str(e))
         vm.sh("tail -30 /run/user/1000/jstarx/session.log")
-    code, env = vm.sh("P=$(pgrep -u storm -f 'starx.shell' | head -1); tr '\\0' '\\n' < /proc/$P/environ | grep -E 'STARX_HEADLESS|WLR_BACKENDS'")
+    code, env = vm.sh("P=$(pgrep -u storm -f 'starx[.]shell' | head -1); tr '\\0' '\\n' < /proc/$P/environ | grep -E 'STARX_HEADLESS|WLR_BACKENDS'")
     rep.check("Session knows there is no screen", "STARX_HEADLESS=1" in env, env.strip().replace("\n", " "))
     try:
         out = vm.wait_sh("grep -E '\"state\": \"(searching|none-found|starting|casting)\"' /run/user/1000/jstarx/cast.json", 600, every=10)
@@ -367,7 +367,7 @@ def run_tests(vm, rep, args):
 
     vm.login()
     if args.repair_only:
-        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 1500, every=15)
         rep.check("StarShell desktop started", True)
         snapshot_resources(vm, rep, args.out)
         return run_repair_tests(vm, rep, args)
@@ -388,7 +388,7 @@ def run_tests(vm, rep, args):
 
     # ---------------------------------------------------------------- 3. desktop
     try:
-        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null && test -S /run/user/1000/jstarx/shell.sock", 1500, every=15)
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null && test -S /run/user/1000/jstarx/shell.sock", 1500, every=15)
         rep.check("StarShell desktop started", True)
     except Timeout as e:
         rep.check("StarShell desktop started", False, str(e))
@@ -452,17 +452,17 @@ def run_repair_tests(vm, rep, args):
     # end the desktop session, then let greetd log in again (it only auto-logs in once per boot otherwise)
     vm.sh("pkill -u storm -f starx-shell-supervisor; pkill -u storm -x labwc; sleep 8; rm -f /run/greetd.run; systemctl restart greetd")
     try:
-        vm.wait_sh("P=$(pgrep -n -u storm -f 'starx.shell') && tr '\\0' '\\n' < /proc/$P/environ | grep -q 'JSTARX_LAYER=/var/lib/jstarx/layers/a'", 1500, every=15)
+        vm.wait_sh("P=$(pgrep -n -u storm -f 'starx[.]shell') && tr '\\0' '\\n' < /proc/$P/environ | grep -q 'JSTARX_LAYER=/var/lib/jstarx/layers/a'", 1500, every=15)
         on_a = True
     except Timeout:
         on_a = False
     rep.check("Desktop restarts on the updated layer (slot A)", on_a)
     vm.sh("sleep 5; pkill -u storm -x swayidle || true")
     for i in range(3):
-        _, pid = vm.sh("pgrep -n -u storm -f 'starx.shell'")
-        vm.sh("pkill -9 -u storm -f 'starx.shell' || true")
+        _, pid = vm.sh("pgrep -n -u storm -f 'starx[.]shell'")
+        vm.sh("pkill -9 -u storm -f 'starx[.]shell' || true")
         if i < 2:
-            vm.wait_sh(f"P=$(pgrep -n -u storm -f 'starx.shell') && [ -n \"$P\" ] && [ \"$P\" != '{pid.strip()}' ]", 600, every=3)
+            vm.wait_sh(f"P=$(pgrep -n -u storm -f 'starx[.]shell') && [ -n \"$P\" ] && [ \"$P\" != '{pid.strip()}' ]", 600, every=3)
     try:
         vm.wait_sh("grep -q 'auto-repair switched' /run/user/1000/jstarx/supervisor.log", 900, every=10)
         switched = True
@@ -471,7 +471,7 @@ def run_repair_tests(vm, rep, args):
     _, log = vm.sh("tail -5 /run/user/1000/jstarx/supervisor.log; readlink -f /var/lib/jstarx/layers/current")
     rep.check("Crashing desktop is rolled back to a working version", switched and "jstarx-layer" in log, log[-250:])
     try:
-        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 900, every=10)
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 900, every=10)
         rep.check("Desktop is running again after the repair", True)
     except Timeout:
         rep.check("Desktop is running again after the repair", False)
@@ -502,7 +502,7 @@ sed -i 's/^DEFAULT .*/DEFAULT jstarx-2/' $C; sync""", check=True)
     rep.check("Went back to build 1 by itself", "jstarx.gen=1" in cmd and "DEFAULT jstarx-1" in cmd and "went back to build 1" in cmd,
               f"{boots} starts: {cmd.splitlines()[-1] if cmd else ''}")
     try:
-        vm.wait_sh("pgrep -u storm -f 'starx.shell' >/dev/null", 1500, every=15)
+        vm.wait_sh("pgrep -u storm -f 'starx[.]shell' >/dev/null", 1500, every=15)
         time.sleep(60)
         vm.monitor.screenshot(os.path.join(out, "after-fallback.png"))
         rep.check("Desktop is back after the fallback", True)

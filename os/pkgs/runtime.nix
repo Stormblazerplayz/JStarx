@@ -6,7 +6,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "starx-runtime";
-  version = "1.0.0";
+  version = "2.0.0";
   dontUnpack = true;
   nativeBuildInputs = [ wrapGAppsHook3 gobject-introspection makeWrapper ];
   buildInputs = [ gtk3 webkitgtk_4_1 gtk-layer-shell glib-networking librsvg gdk-pixbuf gsettings-desktop-schemas ];

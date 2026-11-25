@@ -63,6 +63,11 @@ class Bridge:
         ucm.add_script(WebKit2.UserScript.new(script, WebKit2.UserContentInjectedFrames.TOP_FRAME,
                                               WebKit2.UserScriptInjectionTime.START, None, None))
         kwargs = {"user_content_manager": ucm}
+        if self._first is None:
+            try:  # smallest memory caches: every JStarx page is a local file
+                WebKit2.WebContext.get_default().set_cache_model(WebKit2.CacheModel.DOCUMENT_VIEWER)
+            except (AttributeError, TypeError):
+                pass
         if self._first is not None:
             kwargs["related_view"] = self._first  # share one web process: less memory, faster start
         view = WebKit2.WebView(**kwargs)
@@ -76,12 +81,15 @@ class Bridge:
                           ("javascript-can-access-clipboard", True), ("enable-developer-extras", DEV),
                           ("enable-write-console-messages-to-stdout", DEV or os.environ.get("STARX_CONSOLE") == "1"),
                           ("enable-webgl", False), ("enable-media-stream", False), ("default-font-family", "Inter"),
-                          ("enable-back-forward-navigation-gestures", False)):
+                          ("enable-back-forward-navigation-gestures", False),
+                          # JStarx pages are local: no page cache, prefetching, web audio or DRM (less RAM and CPU)
+                          ("enable-page-cache", False), ("enable-dns-prefetching", False), ("enable-webaudio", False),
+                          ("enable-encrypted-media", False), ("enable-media-capabilities", False), ("enable-hyperlink-auditing", False)):
             try:
                 s.set_property(prop, val)
             except TypeError:
                 pass
-        s.set_user_agent_with_application_details("JStarx", "1.0")
+        s.set_user_agent_with_application_details("JStarx", "2.0")
         if transparent:
             view.set_background_color(Gdk.RGBA(0, 0, 0, 0))
         view.connect("decide-policy", self._on_policy)

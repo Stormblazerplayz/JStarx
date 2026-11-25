@@ -1,12 +1,16 @@
 {
   "name": "JStarx Layer",
-  "version": "1.0.0",
-  "codename": "Nebula",
+  "version": "2.0.0",
+  "codename": "Supernova",
   "released": "2026-11-25",
   "notes": [
-    "First release of JStarx OS: StarShell desktop, dynamic island, dock, launchpad and folders",
-    "Settings, Star Store, AI Center, Spark 1 assistant, Claude and Firefox",
-    "Auto-update from GitHub, auto-repair, power profiles, wireless display casting",
-    "Games: Star Snake, Nebula Dodge, Starbreaker"
+    "JStarx v2: faster start, lighter on memory and kinder to the SD card",
+    "Full-screen apps whose title bars curve around the Dynamic Island (JStarx apps and Firefox)",
+    "Hover the island to open it: Today and Memory tabs",
+    "Memory page in Settings: up to 12 GB usable (4 GB RAM + up to 8 GB swap), Free up now, Memory saver",
+    "Power modes: Low power, Power saver, Balanced, Performance and Extreme, plus fan control",
+    "Spark 1 runs Storm's own model, with a Faster answers option",
+    "Whole-system updates from GitHub, auto-repair with a boot safety net, wireless display casting",
+    "Settings, Star Store, AI Center, Claude, Firefox and 3 games"
   ]
 }

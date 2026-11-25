@@ -20,12 +20,12 @@
   "bin/starx-claude": "7c8af3c399195b6a59c8aa56d5aafb6022aee5981304431c7a496ab09a0d6c0c",
   "bin/starx-ctl": "0b406603113e4058a6a73020f9e4656d7ebac33409d2dd987809f4a93263ecb4",
   "bin/starx-shell": "922330c15b8e038da8208e7e908299f9bab12d1ae142a19a97b257968f887dcf",
-  "layer.json": "07c97d94dd4eedb3f7a607b2037bfb83b6e0e2ede67a1822f29c8115cbf27027",
+  "layer.json": "22ff52dccd190291d0d7fb8a0d099cb667e94e40ce320259a6cf7406d97e6cd0",
   "starx/__init__.py": "d2360b67eebc32e5ec0c9be6f3e05b2fe29659e98d52af2776f64c8f4567c83e",
   "starx/api.py": "2b0cfc6f249cbb01d00f3580f778e73f3f81570bd5df667a6da88dc526eda083",
   "starx/app.py": "1cde89e6943d53b39928d1bc45a6eeb4b5371e51da3b6ef16541c530b46a4a15",
   "starx/apps.py": "b6dd6adf57847ba615e8bea8f240621655e04274ef65ad420d9a92b126498cd9",
-  "starx/bridge.py": "e7fc854c02f3a0f85bb55c7c78c89044c47cb727a74eed7c6e8d1297dc16006d",
+  "starx/bridge.py": "cd76faf87ae4a5143ac65f4d77e96c9e0c7d764e54330ef49e9784adcec9127f",
   "starx/ctl.py": "5642468762218a01c72b06ddcdca3950a3da08be38df3ca388eede7214c3579a",
   "starx/daemon.py": "c21535933b23aadc8aef0f837880c247f7b4442c134f2ce2ee5dec5d48c53cf4",
   "starx/notify.py": "b967cac72cdab31c66f9019ce6c3d5ca64c543da8291a20fccd02fff1770e390",
@@ -98,5 +98,5 @@
   "web/shell/overlay.js": "e47512eb156e353086626782d205e689361f8a91d5066feac5491d3bc86a7bfd",
   "web/shell/shell.css": "a00a7721508135172c743035a8b00893d760c081499d71ea8e3e327108398e63"
  },
- "version": "1.0.0"
+ "version": "2.0.0"
 }

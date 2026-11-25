@@ -174,6 +174,11 @@ in
     preferences = {
       "widget.use-xdg-desktop-portal.file-picker" = 1;
       "ui.systemUsesDarkTheme" = 1;
+      # lighter on a 4 GB Jetson: fewer content processes, cache in RAM instead of the SD card
+      "dom.ipc.processCount" = 2;
+      "browser.cache.disk.enable" = false;
+      "browser.cache.memory.capacity" = 65536;
+      "browser.sessionstore.interval" = 60000;
       "browser.theme.toolbar-theme" = 0;
       "browser.tabs.inTitlebar" = 1;   # Firefox draws its own top bar, which curves around the island
       "toolkit.legacyUserProfileCustomizations.stylesheets" = true;   # use the JStarx userChrome.css
@@ -186,6 +191,18 @@ in
   documentation.doc.enable = false;
   documentation.info.enable = false;
   programs.command-not-found.enable = false;
+  documentation.man.enable = false;   # no manual pages: smaller system (every command has --help)
+
+  # ------------------------------------------------------------------ v2 speed + SD card care
+  # start faster: don't wait for the network before showing the desktop
+  systemd.services.NetworkManager-wait-online.enable = false;
+  # fewer writes to the SD card (faster, and the card lasts longer)
+  fileSystems."/".options = [ "noatime" "commit=60" ];
+  boot.tmp.useTmpfs = true;           # temporary files live in RAM (they can swap out)
+  boot.tmp.tmpfsSize = "30%";
+  # updates and app installs run at idle priority, so the desktop and AI stay smooth
+  nix.daemonCPUSchedPolicy = "idle";
+  nix.daemonIOSchedClass = "idle";
   environment.defaultPackages = [ ];
   services.speechd.enable = false;
   networking.modemmanager.enable = false;
@@ -236,12 +253,17 @@ in
     "vm.swappiness" = 150;              # swap idle app memory out aggressively (0-200)
     "vm.watermark_scale_factor" = 125;  # start freeing memory before it runs out
     "vm.page-cluster" = 0;              # zram works best one page at a time
+    "vm.dirty_writeback_centisecs" = 1500;  # write to the SD card in bigger, rarer batches
+    "vm.dirty_expire_centisecs" = 3000;
   };
   systemd.settings.Manager = { RuntimeWatchdogSec = "30s"; RebootWatchdogSec = "2min"; };
   # never stop at a rescue prompt: keep starting, then auto-repair takes over
   systemd.enableEmergencyMode = false;
   services.logind.settings.Login = { HandlePowerKey = "poweroff"; IdleAction = "ignore"; };
-  services.journald.extraConfig = "SystemMaxUse=200M";
+  services.journald.extraConfig = ''
+    SystemMaxUse=100M
+    RuntimeMaxUse=32M
+  '';
 
   # ------------------------------------------------------------------ SSH (off until switched on in Settings)
   services.openssh = { enable = true; settings.PermitRootLogin = "no"; };
