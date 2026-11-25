@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Spark</title>
+<link rel="stylesheet" href="../../common/theme.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  .bar img { width: 40px; height: 40px; }
+  .bar b { font-size: 18px; } .bar .faint { font-size: 13px; }
+  .msgs { flex: 1; overflow: auto; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .m { max-width: 78%; padding: 12px 16px; border-radius: 20px; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word; font-size: 15px; }
+  .m.user { align-self: flex-end; background: linear-gradient(135deg, #9D4EDD, #7B2CBF); border-bottom-right-radius: 6px; }
+  .m.spark { align-self: flex-start; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); border-bottom-left-radius: 6px; }
+  .m.err { background: rgba(255,107,129,.14); box-shadow: inset 0 0 0 1px rgba(255,107,129,.4); }
+  .cursor { display: inline-block; width: 8px; height: 17px; background: var(--o-300); vertical-align: -3px; border-radius: 2px; animation: pulse 1s infinite; }
+  .hello { margin: auto; text-align: center; max-width: 520px; }
+  .hello img { width: 110px; height: 110px; }
+  .hello h2 { font-size: 26px; margin: 10px 0 6px; }
+  .sugs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+  .sugs button { padding: 9px 14px; border-radius: 99px; background: rgba(255,255,255,.08); font-weight: 600; font-size: 13.5px; }
+  .sugs button:hover { background: rgba(255,255,255,.14); }
+  form { display: flex; gap: 10px; padding: 14px 20px 18px; }
+  form textarea { flex: 1; height: 48px; max-height: 160px; resize: none; padding: 13px 16px; border-radius: 18px; }
+  .banner { margin: 12px 20px 0; padding: 12px 16px; border-radius: 16px; background: rgba(255,192,77,.12); box-shadow: inset 0 0 0 1px rgba(255,192,77,.35); display: flex; gap: 12px; align-items: center; }
+</style>
+</head>
+<body>
+<div class="bar"><img src="../../icons/spark.svg" alt=""><div class="grow"><b>Spark 1</b><div class="faint" id="state">Checking…</div></div>
+  <button class="btn small" id="clear">New chat</button></div>
+<div id="banner"></div>
+<div class="msgs" id="msgs"></div>
+<form id="f"><textarea class="field" id="q" placeholder="Message Spark…" rows="1"></textarea><button class="btn primary" id="send">Send</button></form>
+<script src="../../common/starx.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const S = window.StarX, $ = S.$, esc = S.esc;
+  let chat = (await S.call('appdata.get', { key: 'chat' }).catch(() => null)) || [];
+  let req = null, live = null, liveText = '';
+
+  function hello() {
+    return `<div class="hello"><img src="../../icons/spark.svg" alt=""><h2>Hi, I'm Spark 1</h2><div class="muted">I run right here on your Jetson. Ask me anything.</div>
+      <div class="sugs">${['Explain how a CPU works', 'Give me a fun science fact', 'Help me plan a robot project', 'Write a short story about a star'].map(t => `<button>${t}</button>`).join('')}</div></div>`;
+  }
+  function render() {
+    $('#msgs').innerHTML = chat.length ? chat.map(m => `<div class="m ${m.role === 'user' ? 'user' : 'spark'} ${m.error ? 'err' : ''}">${esc(m.content)}</div>`).join('') : hello();
+    $('#msgs').scrollTop = 1e9;
+  }
+  async function status() {
+    let st = {}; try { st = await S.call('spark.status'); } catch (e) { }
+    const ok = st.engine === 'ok';
+    $('#state').textContent = ok ? 'Running on this Jetson' : st.state === 'downloading' ? `Downloading model… ${st.progress || 0}%` : 'Model not installed yet';
+    $('#banner').innerHTML = ok ? '' : `<div class="banner">${S.icon('sparkle')}<div class="grow"><b>Spark 1 needs its model file.</b><div class="muted" style="font-size:13px">Download it from your GitHub release, or import a .gguf file in Settings → AI & Spark.</div></div>
+      <button class="btn small primary" id="get">${S.icon('download')} Download</button></div>`;
+    const g = $('#get'); if (g) g.onclick = async () => { try { await S.call('spark.download'); S.toast('Downloading Spark 1…'); } catch (e) { S.toast(e.message); } status(); };
+  }
+  const save = () => S.call('appdata.set', { key: 'chat', value: chat.slice(-60) }).catch(() => { });
+
+  async function send(text) {
+    text = text.trim(); if (!text || req) return;
+    chat.push({ role: 'user', content: text }); render();
+    $('#q').value = '';
+    live = S.h(`<div class="m spark"><span class="cursor"></span></div>`); $('#msgs').appendChild(live);
+    S.spring(live, { y: 16, scale: .9, opacity: 0 }, { y: 0, scale: 1, opacity: 1 });
+    liveText = '';
+    try { const r = await S.call('spark.chat', { messages: chat.filter(m => !m.error).map(m => ({ role: m.role, content: m.content })) }); req = r.req; }
+    catch (e) { finish(e.message); }
+  }
+  function finish(error) {
+    if (error) chat.push({ role: 'assistant', content: error, error: true });
+    else chat.push({ role: 'assistant', content: liveText || '…' });
+    req = null; live = null; save(); render();
+  }
+  S.on('spark-token', d => { if (d.req !== req || !live) return; liveText += d.text; live.innerHTML = esc(liveText) + '<span class="cursor"></span>'; $('#msgs').scrollTop = 1e9; });
+  S.on('spark-done', d => { if (d.req !== req) return; finish(d.error); });
+
+  $('#f').addEventListener('submit', e => { e.preventDefault(); send($('#q').value); });
+  $('#q').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('#q').value); } });
+  $('#msgs').addEventListener('click', e => { const b = e.target.closest('.sugs button'); if (b) send(b.textContent); });
+  $('#clear').onclick = () => { if (req) S.send('spark.stop', { req }); req = null; chat = []; save(); render(); };
+  render(); status(); setInterval(() => { if (!document.hidden) status(); }, 15000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+{ "id": "notes", "name": "Star Notes", "version": "1.0.0", "entry": "index.html", "icon": "icon.svg", "category": "Productivity",
+  "description": "Quick notes that save by themselves." }

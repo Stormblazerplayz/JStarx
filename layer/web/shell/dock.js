@@ -49,12 +49,14 @@
   }
 
   /* glass shows the blurred wallpaper exactly behind the dock */
+  let geo = null;
   function alignGlass() {
     const scr = S.ctx.screen || { width: innerWidth, height: innerHeight };
-    const ox = (scr.width - innerWidth) / 2, oy = scr.height - innerHeight;
+    const ox = geo ? geo.x : (scr.width - innerWidth) / 2, oy = geo ? geo.y : scr.height - innerHeight;
     S.wallBehind(ox, oy);
     S.alignGlass(dock, ox, oy);
   }
+  S.on('geometry', g => { geo = g; alignGlass(); S.repaint(); });
   window.addEventListener('resize', alignGlass);
 
   function sizeSurface() {

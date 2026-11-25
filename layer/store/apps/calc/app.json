@@ -1,0 +1,2 @@
+{ "id": "calc", "name": "Star Calc", "version": "1.0.0", "entry": "index.html", "icon": "icon.svg", "category": "Productivity",
+  "description": "A bouncy calculator with history." }

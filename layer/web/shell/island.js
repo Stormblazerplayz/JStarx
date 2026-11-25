@@ -20,11 +20,14 @@
     S.send('shell.size', { surface: 'island', w: s.w, h: s.h, exclusive: SMALL.h });
   }
   function input() { /* opaque surface: no input region needed */ }
+  let geo = null;
   function alignGlass() {
     const scr = S.ctx.screen || { width: innerWidth };
-    S.wallBehind((scr.width - innerWidth) / 2, 0);
-    S.alignGlass(island, (scr.width - innerWidth) / 2, 0);
+    const ox = geo ? geo.x : (scr.width - innerWidth) / 2, oy = geo ? geo.y : 0;
+    S.wallBehind(ox, oy);
+    S.alignGlass(island, ox, oy);
   }
+  S.on('geometry', g => { geo = g; alignGlass(); S.repaint(); });
   window.addEventListener('resize', alignGlass);
   island.addEventListener('transitionend', e => { if (e.propertyName === 'width' || e.propertyName === 'height') { input(); alignGlass(); } });
 

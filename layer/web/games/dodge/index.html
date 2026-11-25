@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Nebula Dodge</title>
+<link rel="stylesheet" href="../../common/theme.css"><link rel="stylesheet" href="../games.css"></head>
+<body>
+<div class="hud"><span>Score <span class="score" id="score">0</span></span><span id="lives"></span><span class="faint">Best <span id="best">0</span></span><span class="grow"></span><span class="faint">Arrows / mouse · P pauses</span></div>
+<div class="stage"><canvas id="game"></canvas><div id="overlay"></div></div>
+<script src="../../common/starx.js"></script><script src="../games.js"></script>
+<script>
+(function () {
+  const G = window.Game, S = window.StarX;
+  let ship, rocks, stars, powers, bg, score, lives, inv, spawnT, starT, t, alive, shield, mouseX = null;
+  function reset() {
+    ship = { x: G.w / 2, y: G.h - 70, vx: 0 }; rocks = []; stars = []; powers = []; score = 0; lives = 3; inv = 0; spawnT = 0; starT = 0; t = 0; alive = true; shield = false;
+    bg = Array.from({ length: 120 }, () => ({ x: Math.random() * G.w, y: Math.random() * G.h, z: .3 + Math.random() * 1.2 }));
+    hud();
+  }
+  function hud() {
+    document.getElementById('score').textContent = Math.floor(score);
+    document.getElementById('lives').innerHTML = '❤️'.repeat(Math.max(0, lives)) + (shield ? ' 🛡️' : '');
+  }
+  function rock() {
+    const r = 14 + Math.random() * 30, pts = Array.from({ length: 9 }, (_, i) => { const a = i / 9 * 6.283; return [Math.cos(a) * r * (.75 + Math.random() * .3), Math.sin(a) * r * (.75 + Math.random() * .3)]; });
+    rocks.push({ x: Math.random() * G.w, y: -r, r, pts, vy: 120 + Math.random() * 120 + t * 4, vx: (Math.random() - .5) * 60, rot: 0, vr: (Math.random() - .5) * 2 });
+  }
+  function hit() {
+    if (inv > 0) return;
+    if (shield) { shield = false; inv = 1; G.burst(ship.x, ship.y, '#4FD1FF', 30); hud(); return; }
+    lives--; inv = 1.8; G.shake = 16; G.burst(ship.x, ship.y, '#FF8A00', 40, 300); hud();
+    if (lives <= 0) {
+      alive = false; const sc = Math.floor(score), rec = G.saveBest(sc);
+      setTimeout(() => { G.stop(); G.screen('Ship down!', `You scored <b>${sc}</b>${rec ? ' · New best! 🎉' : ''}`, '<button class="btn primary" style="margin-top:12px">Fly again</button>'); }, 900);
+    }
+  }
+  function update(dt) {
+    if (G.pressed.has('KeyP') || G.pressed.has('Escape')) return G.pause(true);
+    t += dt; if (!alive) return;
+    score += dt * 10;
+    const acc = 1900;
+    if (G.left()) ship.vx -= acc * dt; else if (G.right()) ship.vx += acc * dt; else if (mouseX != null) ship.vx += (mouseX - ship.x) * 14 * dt;
+    ship.vx *= Math.pow(.02, dt); ship.x = Math.max(20, Math.min(G.w - 20, ship.x + ship.vx * dt)); ship.y = G.h - 70;
+    bg.forEach(s => { s.y += 60 * s.z * dt * (1 + t / 60); if (s.y > G.h) { s.y = 0; s.x = Math.random() * G.w; } });
+    spawnT -= dt; if (spawnT <= 0) { rock(); spawnT = Math.max(.18, .75 - t / 90); }
+    starT -= dt; if (starT <= 0) { stars.push({ x: 30 + Math.random() * (G.w - 60), y: -20, vy: 160 }); starT = 1.6; if (Math.random() < .12) powers.push({ x: 40 + Math.random() * (G.w - 80), y: -20, vy: 140 }); }
+    rocks.forEach(r => { r.y += r.vy * dt; r.x += r.vx * dt; r.rot += r.vr * dt; if (Math.hypot(r.x - ship.x, r.y - ship.y) < r.r * .8 + 14) { r.dead = true; G.burst(r.x, r.y, '#9D4EDD', 16); hit(); } });
+    stars.forEach(s => { s.y += s.vy * dt; if (Math.hypot(s.x - ship.x, s.y - ship.y) < 30) { s.dead = true; score += 25; G.burst(s.x, s.y, '#FFD166', 20); const el = document.getElementById('score'); S.spring(el, { scale: 1.5 }, { scale: 1 }, { damping: .35 }); } });
+    powers.forEach(p => { p.y += p.vy * dt; if (Math.hypot(p.x - ship.x, p.y - ship.y) < 30) { p.dead = true; shield = true; G.burst(p.x, p.y, '#4FD1FF', 26); hud(); } });
+    rocks = rocks.filter(r => !r.dead && r.y < G.h + 60); stars = stars.filter(s => !s.dead && s.y < G.h + 30); powers = powers.filter(p => !p.dead && p.y < G.h + 30);
+    inv = Math.max(0, inv - dt);
+    if (Math.floor(t * 10) % 5 === 0) hud();
+  }
+  function draw(c) {
+    c.clearRect(0, 0, G.w, G.h);
+    bg.forEach(s => { c.fillStyle = `rgba(255,255,255,${.25 * s.z})`; c.fillRect(s.x, s.y, s.z * 1.6, s.z * 1.6); });
+    stars.forEach(s => { c.shadowColor = '#FFD166'; c.shadowBlur = 16; G.star(c, s.x, s.y, 12, '#FFD166', t * 2); });
+    powers.forEach(p => { c.shadowColor = '#4FD1FF'; c.shadowBlur = 16; c.strokeStyle = '#4FD1FF'; c.lineWidth = 3; c.beginPath(); c.arc(p.x, p.y, 12, 0, 6.283); c.stroke(); });
+    c.shadowBlur = 0;
+    rocks.forEach(r => {
+      c.save(); c.translate(r.x, r.y); c.rotate(r.rot);
+      const g = c.createLinearGradient(-r.r, -r.r, r.r, r.r); g.addColorStop(0, '#7B5BA6'); g.addColorStop(1, '#2A1747');
+      c.fillStyle = g; c.beginPath(); r.pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.18)'; c.stroke(); c.restore();
+    });
+    if (alive && !(inv > 0 && Math.floor(t * 12) % 2)) {
+      c.save(); c.translate(ship.x, ship.y); c.rotate(ship.vx / 2000);
+      c.shadowColor = '#FF8A00'; c.shadowBlur = 20; c.fillStyle = '#FF9F43'; c.beginPath(); c.moveTo(-6, 18); c.lineTo(6, 18); c.lineTo(0, 30 + Math.random() * 10); c.fill();
+      c.shadowColor = '#C77DFF'; c.fillStyle = '#F3E8FF'; c.beginPath(); c.moveTo(0, -24); c.quadraticCurveTo(14, -4, 12, 18); c.lineTo(-12, 18); c.quadraticCurveTo(-14, -4, 0, -24); c.fill();
+      c.fillStyle = '#7B2CBF'; c.beginPath(); c.arc(0, -4, 5, 0, 6.283); c.fill();
+      if (shield) { c.strokeStyle = 'rgba(79,209,255,.8)'; c.lineWidth = 2.5; c.beginPath(); c.arc(0, 0, 32, 0, 6.283); c.stroke(); }
+      c.restore();
+    }
+    c.shadowBlur = 0;
+  }
+  G.init('dodge', update, draw);
+  document.getElementById('game').addEventListener('pointermove', e => { const r = e.target.getBoundingClientRect(); mouseX = e.clientX - r.left; });
+  const begin = () => { reset(); G.start(); };
+  document.getElementById('overlay').addEventListener('click', () => G.paused ? G.pause(false) : begin());
+  addEventListener('keydown', e => { if (!G.running && (e.code === 'Space' || e.code === 'Enter')) begin(); else if (G.paused && (e.code === 'KeyP' || e.code === 'Space')) G.pause(false); });
+  setTimeout(() => G.screen('Nebula Dodge', 'Fly through the asteroid field. Grab gold stars for points and blue rings for a shield.', '<button class="btn primary" style="margin-top:12px">Launch</button><div class="keys">Arrows / A D / mouse / gamepad · P to pause</div>'), 50);
+})();
+</script></body></html>

@@ -34,7 +34,7 @@ def install_web(entry, bundled_base, branch, repo, progress):
                 raise ValueError(f"unsafe file name {rel}")
             progress(f"Downloading {rel}", round(100 * i / len(files)))
             data = None
-            url = f"https://raw.githubusercontent.com/{repo}/{branch}/store/apps/{app_id}/{rel}"
+            url = f"https://raw.githubusercontent.com/{repo}/{branch}/layer/store/apps/{app_id}/{rel}"
             try:
                 data = _fetch(url)
                 if _sha256(data) != digest:
@@ -78,7 +78,11 @@ def install_nix(entry, progress):
     """Install a package from the same nixpkgs the system was built from (binary cache, no compiling)."""
     attr = entry["nix"]
     env = dict(os.environ, NIXPKGS_ALLOW_UNFREE="1" if entry.get("unfree") else "0")
-    cmd = ["nix", "--extra-experimental-features", "nix-command flakes", "profile", "install", "--impure", f"nixpkgs#{attr}"]
+    cmd = ["nix", "--extra-experimental-features", "nix-command flakes", "profile", "install", "--impure"]
+    if entry.get("nix_expr"):  # e.g. a Python with AI libraries
+        cmd += ["--expr", entry["nix_expr"]]
+    else:
+        cmd += [f"nixpkgs#{attr}"]
     progress(f"Installing {entry['name']} (this can take a few minutes)", None)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
     last = ""

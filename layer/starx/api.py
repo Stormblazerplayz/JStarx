@@ -60,6 +60,12 @@ class Api:
         save_home(layout)
         return True
 
+    def m_home_reset(self, view=None):
+        from .settings import DEFAULT_HOME
+        save_home(DEFAULT_HOME)
+        _notify_shell("reload")
+        return True
+
     def m_open_url(self, url, view=None):
         if not str(url).startswith(("http://", "https://")):
             raise ValueError("only web links can be opened")
@@ -200,6 +206,47 @@ class Api:
             raise ValueError("unknown system setting")
         return daemon.starxd("system_set", key=key, value=value)
 
+    # ------------------------------------------------------------------ per-app storage (notes, high scores...)
+    def _appdata_path(self):
+        safe = "".join(c for c in (self.app_id or "shell") if c.isalnum() or c in "-_")
+        return os.path.join(paths.DATA, "appdata", f"{safe}.json")
+
+    def m_appdata_get(self, key=None, view=None):
+        try:
+            with open(self._appdata_path()) as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        return data.get(key) if key else data
+
+    def m_appdata_set(self, key, value, view=None):
+        from .settings import atomic_write_json
+        data = self.m_appdata_get()
+        data[str(key)] = value
+        blob = json.dumps(data)
+        if len(blob) > 5_000_000:
+            raise ValueError("this app's saved data is too big (5 MB limit)")
+        atomic_write_json(self._appdata_path(), data)
+        return True
+
+    def m_files_save_image(self, name, data_url, view=None):
+        import base64
+        import re
+        m = re.match(r"^data:image/png;base64,(.+)$", data_url or "")
+        if not m:
+            raise ValueError("not a PNG image")
+        folder = os.path.join(paths.HOME, "Pictures")
+        os.makedirs(folder, exist_ok=True)
+        safe = "".join(c for c in name if c.isalnum() or c in " -_")[:60].strip() or "drawing"
+        path = os.path.join(folder, f"{safe}.png")
+        n = 1
+        while os.path.exists(path):
+            n += 1
+            path = os.path.join(folder, f"{safe} {n}.png")
+        with open(path, "wb") as f:
+            f.write(base64.b64decode(m.group(1)))
+        return path
+
     # ------------------------------------------------------------------ Star Store
     def _catalog_local(self):
         for base in (os.path.join(paths.LAYER, "store"), os.path.join(paths.LAYER, "..", "store")):
@@ -213,7 +260,7 @@ class Api:
     def m_store_catalog(self, refresh=False, view=None):
         catalog, _ = self._catalog_local()
         if refresh:
-            url = f"https://raw.githubusercontent.com/{REPO}/{self.settings.get('updates.branch')}/store/catalog.json"
+            url = f"https://raw.githubusercontent.com/{REPO}/{self.settings.get('updates.branch')}/layer/store/catalog.json"
             try:
                 with urllib.request.urlopen(url, timeout=12) as r:
                     catalog = json.load(r)
@@ -293,7 +340,8 @@ class Api:
 
     @threaded
     def m_spark_service(self, action, view=None):
-        return daemon.starxd("spark_service", action=action)
+        return daemon.starxd("spark_service", action=action, threads=self.settings.get("spark.threads"),
+                             ctx=self.settings.get("spark.ctx"))
 
     def m_spark_chat(self, messages, view=None):
         """Stream an answer from Spark 1. Sends 'spark-token' events, then 'spark-done'."""

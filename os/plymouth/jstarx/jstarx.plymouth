@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=JStarx
+Description=JStarx OS boot screen: bouncing star, glass progress bar
+ModuleName=script
+
+[script]
+ImageDir=@out@/share/plymouth/themes/jstarx
+ScriptFile=@out@/share/plymouth/themes/jstarx/jstarx.script

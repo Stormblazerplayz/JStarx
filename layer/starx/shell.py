@@ -3,8 +3,10 @@ control center, Spark). Run with:  python3 -m starx.shell
 """
 import json
 import os
+import shutil
 import signal
 import socket
+import subprocess
 import sys
 import time
 
@@ -61,8 +63,21 @@ class Surface:
         self.win = win
         self.size = size
         win.connect("map-event", lambda *a: self.repaint())
+        win.connect("size-allocate", self._on_alloc)
+        self.anchors = anchors
+        self.geometry = None
         if visible:
             win.show_all()
+
+    def _on_alloc(self, win, alloc):
+        W, H = self.shell.screen["width"], self.shell.screen["height"]
+        w, h = alloc.width, alloc.height
+        x = 0 if Edge.LEFT in self.anchors else (W - w if Edge.RIGHT in self.anchors else (W - w) // 2)
+        y = 0 if Edge.TOP in self.anchors else (H - h if Edge.BOTTOM in self.anchors else (H - h) // 2)
+        geo = {"x": x, "y": y, "w": w, "h": h}
+        if geo != self.geometry:
+            self.geometry = geo
+            self.shell.bridge.emit("geometry", geo, [self.view])
 
     def repaint(self):
         from .bridge import run_js
@@ -130,6 +145,9 @@ class ShellApi(Api):
 
     def m_shell_ready(self, view=None):
         self.shell.surface_ready(view)
+        for s in self.shell.surfaces.values():
+            if s.view is view and s.geometry:
+                self.shell.bridge.emit("geometry", s.geometry, [view])
         return True
 
     # windows
@@ -210,9 +228,35 @@ class Shell:
         self._status_changed(initial=True)
 
         self._start_socket()
+        self.idle_proc = None
+        self.idle_cfg = None
+        self._start_idle()
+        if os.environ.get("STARX_SAFE_MODE") == "1":
+            GLib.timeout_add(3000, lambda: (self.notify("Safe Mode", "JStarx had a problem and auto-repair is fixing it. "
+                                                        "Open Settings → Repair & Recovery for details.", icon="shield"), False)[1])
         GLib.timeout_add_seconds(3, self._poll_windows)
         GLib.timeout_add_seconds(20, self._report_health)
         GLib.timeout_add(2500, self._maybe_welcome)
+
+    def _start_idle(self):
+        """Screen power saving: after a while the shell rests and the screen turns off (swayidle)."""
+        dim = int(self.api.settings.get("power.dim_min"))
+        off = int(self.api.settings.get("power.screen_off_min"))
+        if (dim, off) == self.idle_cfg and self.idle_proc and self.idle_proc.poll() is None:
+            return
+        self.idle_cfg = (dim, off)
+        if self.idle_proc and self.idle_proc.poll() is None:
+            self.idle_proc.terminate()
+        if not shutil.which("swayidle"):
+            return
+        ctl = shutil.which("starx-ctl") or "starx-ctl"
+        args = ["swayidle", "-w"]
+        if dim:
+            args += ["timeout", str(dim * 60), f"{ctl} idle on", "resume", f"{ctl} idle off"]
+        if off:
+            args += ["timeout", str(off * 60), "wlopm --off '*'", "resume", "wlopm --on '*'"]
+        if len(args) > 2:
+            self.idle_proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def _maybe_welcome(self):
         if not self.api.settings.get("welcome_done") and os.environ.get("STARX_NO_WELCOME") != "1":
@@ -228,6 +272,7 @@ class Shell:
     def _settings_changed(self):
         self.api.settings.data = self.api.settings.load()
         s = self.api.settings.get()
+        self._start_idle()
         dock = self.surfaces["dock"]
         dock.resize(dock.size[0], self._dock_zone())
         dock.exclusive(self._dock_zone())

@@ -1,0 +1,2 @@
+{ "id": "paint", "name": "Star Paint", "version": "1.0.0", "entry": "index.html", "icon": "icon.svg", "category": "Creative",
+  "description": "Draw with glowing brushes and save to Pictures." }

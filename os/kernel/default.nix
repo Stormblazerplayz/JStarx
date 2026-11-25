@@ -1,11 +1,13 @@
 # StarX Kernel: Linux 6.12 LTS with the JStarx configuration and boot logo.
 # Built with a cross compiler (x86_64 -> aarch64) so it compiles fast on a PC.
-{ lib, linuxManualConfig, linux_6_12 }:
+# NixOS calls kernel.override { features, randstructSeed, kernelPatches }, so those are passed on.
+{ lib, linuxManualConfig, linux_6_12, features ? { }, randstructSeed ? "", kernelPatches ? [ ] }:
 
 let
   base = linux_6_12;
   kernel = linuxManualConfig {
     inherit (base) src version;
+    inherit features randstructSeed kernelPatches;
     modDirVersion = "${base.version}-starx";
     configfile = ./starx.config;
     extraMeta = {

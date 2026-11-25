@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!-- JStarx window manager settings (labwc) -->
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>6</gap>
+    <reuseOutputMode>yes</reuseOutputMode>
+  </core>
+  <theme>
+    <name>JStarx</name>
+    <cornerRadius>14</cornerRadius>
+    <dropShadows>yes</dropShadows>
+    <font place="ActiveWindow"><name>Inter</name><size>11</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>Inter</name><size>11</size></font>
+    <font place="MenuItem"><name>Inter</name><size>11</size></font>
+    <font place="OnScreenDisplay"><name>Inter</name><size>11</size></font>
+  </theme>
+  <placement><policy>cascade</policy></placement>
+  <focus><followMouse>no</followMouse><raiseOnFocus>yes</raiseOnFocus></focus>
+  <snapping><range>12</range><topMaximize>yes</topMaximize></snapping>
+  <keyboard>
+    <default />
+    <keybind key="Super_L" onRelease="yes"><action name="Execute" command="starx-ctl start" /></keybind>
+    <keybind key="W-space"><action name="Execute" command="starx-ctl spark" /></keybind>
+    <keybind key="W-a"><action name="Execute" command="starx-ctl launchpad" /></keybind>
+    <keybind key="W-c"><action name="Execute" command="starx-ctl control" /></keybind>
+    <keybind key="W-p"><action name="Execute" command="starx-ctl power" /></keybind>
+    <keybind key="W-e"><action name="Execute" command="starx-ctl launch settings" /></keybind>
+    <keybind key="W-b"><action name="Execute" command="firefox" /></keybind>
+    <keybind key="W-Return"><action name="Execute" command="foot" /></keybind>
+    <keybind key="W-q"><action name="Close" /></keybind>
+    <keybind key="W-Up"><action name="ToggleMaximize" /></keybind>
+    <keybind key="W-Down"><action name="Iconify" /></keybind>
+    <keybind key="W-Left"><action name="SnapToEdge" direction="left" /></keybind>
+    <keybind key="W-Right"><action name="SnapToEdge" direction="right" /></keybind>
+    <keybind key="XF86AudioRaiseVolume"><action name="Execute" command="sh -c 'wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+; starx-ctl osd volume'" /></keybind>
+    <keybind key="XF86AudioLowerVolume"><action name="Execute" command="sh -c 'wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-; starx-ctl osd volume'" /></keybind>
+    <keybind key="XF86AudioMute"><action name="Execute" command="sh -c 'wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; starx-ctl osd volume'" /></keybind>
+    <keybind key="Print"><action name="Execute" command="sh -c 'mkdir -p ~/Pictures; f=~/Pictures/Screenshot-$(date +%Y%m%d-%H%M%S).png; grim &quot;$f&quot; &amp;&amp; starx-ctl notify &quot;{\&quot;summary\&quot;: \&quot;Screenshot saved\&quot;, \&quot;body\&quot;: \&quot;In your Pictures folder\&quot;, \&quot;icon\&quot;: \&quot;display\&quot;}&quot;'" /></keybind>
+  </keyboard>
+  <mouse>
+    <default />
+  </mouse>
+  <libinput>
+    <device category="default"><tap>yes</tap><naturalScroll>no</naturalScroll></device>
+  </libinput>
+</labwc_config>

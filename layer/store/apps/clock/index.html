@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Star Clock</title>
+<script>document.write(`<link rel="stylesheet" href="${STARX_CONTEXT.web}/common/theme.css"><link rel="stylesheet" href="${STARX_CONTEXT.web}/apps/app.css"><script src="${STARX_CONTEXT.web}/common/starx.js"><\/script>`);</script>
+<style>
+ body{display:flex;flex-direction:column;align-items:center;padding:28px} .tabs{display:flex;gap:8px;margin-bottom:26px}
+ .tabs button{padding:9px 18px;border-radius:99px;font-weight:700;background:rgba(255,255,255,.08)} .tabs button.on{background:linear-gradient(135deg,#9D4EDD,#FF8A00);color:#1a0a00}
+ .big{font:200 88px var(--font);font-variant-numeric:tabular-nums;letter-spacing:-.03em} .zones{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:min(760px,100%)}
+ .zone{padding:18px;border-radius:22px} .zone b{font-size:34px;font-weight:300;display:block;font-variant-numeric:tabular-nums}
+ .row{justify-content:center;margin-top:16px} #laps{margin-top:16px;width:320px;max-height:220px}
+</style></head><body>
+<div class="tabs"><button data-t="world" class="on">World</button><button data-t="stop">Stopwatch</button><button data-t="timer">Timer</button></div>
+<section id="world"><div class="zones" id="zones"></div></section>
+<section id="stop" class="hidden" style="text-align:center"><div class="big" id="sw">00:00.0</div><div class="row"><button class="btn primary" id="sw-go">Start</button><button class="btn" id="sw-lap">Lap</button><button class="btn" id="sw-reset">Reset</button></div><div class="scroll" id="laps"></div></section>
+<section id="timer" class="hidden" style="text-align:center"><div class="big" id="tm">05:00</div><div class="row"><button class="btn" data-m="-1">−1 min</button><button class="btn" data-m="1">+1 min</button><button class="btn primary" id="tm-go">Start</button><button class="btn" id="tm-reset">Reset</button></div></section>
+<script>
+(function(){
+ const S=StarX,$=S.$; const zones=[['Here',undefined],['Tokyo','Asia/Tokyo'],['London','Europe/London'],['New York','America/New_York'],['Sydney','Australia/Sydney'],['Dubai','Asia/Dubai']];
+ function world(){ $('#zones').innerHTML=zones.map(([n,z])=>`<div class="zone glass strong fixed-bg"><span class="faint">${n}</span><b>${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',timeZone:z})}</b></div>`).join(''); }
+ world(); setInterval(world, 10000);
+ S.$$('.tabs button').forEach(b=>b.onclick=()=>{ S.$$('.tabs button').forEach(x=>x.classList.toggle('on',x===b)); ['world','stop','timer'].forEach(id=>$('#'+id).classList.toggle('hidden',id!==b.dataset.t)); S.spring($('#'+b.dataset.t),{y:20,opacity:0},{y:0,opacity:1}); });
+ let swStart=0, swAcc=0, swRun=false, swT=null; const fmt=ms=>{ const m=Math.floor(ms/60000), s=Math.floor(ms%60000/1000), d=Math.floor(ms%1000/100); return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+d; };
+ const swNow=()=>swAcc+(swRun?Date.now()-swStart:0);
+ $('#sw-go').onclick=()=>{ swRun=!swRun; if(swRun){swStart=Date.now(); swT=setInterval(()=>$('#sw').textContent=fmt(swNow()),100);} else {swAcc=swNow(); clearInterval(swT);} $('#sw-go').textContent=swRun?'Stop':'Start'; };
+ $('#sw-lap').onclick=()=>{ $('#laps').insertAdjacentHTML('afterbegin',`<div class="list-row"><span class="grow">Lap ${$('#laps').children.length+1}</span><b>${fmt(swNow())}</b></div>`); };
+ $('#sw-reset').onclick=()=>{ swRun=false; clearInterval(swT); swAcc=0; $('#sw').textContent=fmt(0); $('#laps').innerHTML=''; $('#sw-go').textContent='Start'; };
+ let tmLeft=300, tmRun=false, tmT=null; const tfmt=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); const tshow=()=>$('#tm').textContent=tfmt(tmLeft);
+ S.$$('[data-m]').forEach(b=>b.onclick=()=>{ tmLeft=Math.max(60,tmLeft+60*+b.dataset.m); tshow(); });
+ $('#tm-go').onclick=()=>{ tmRun=!tmRun; $('#tm-go').textContent=tmRun?'Pause':'Start'; clearInterval(tmT); if(tmRun) tmT=setInterval(()=>{ tmLeft--; tshow(); if(tmLeft<=0){ clearInterval(tmT); tmRun=false; $('#tm-go').textContent='Start'; tmLeft=300; S.toast('⏰ Time is up!'); S.launchBounce($('#tm'),4); } },1000); };
+ $('#tm-reset').onclick=()=>{ clearInterval(tmT); tmRun=false; tmLeft=300; tshow(); $('#tm-go').textContent='Start'; };
+})();
+</script></body></html>

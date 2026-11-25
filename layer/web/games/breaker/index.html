@@ -1,0 +1,93 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Starbreaker</title>
+<link rel="stylesheet" href="../../common/theme.css"><link rel="stylesheet" href="../games.css"></head>
+<body>
+<div class="hud"><span>Score <span class="score" id="score">0</span></span><span id="lives"></span><span class="faint">Level <span id="lvl">1</span></span><span class="faint">Best <span id="best">0</span></span><span class="grow"></span><span class="faint">Mouse / arrows · Space launches · P pauses</span></div>
+<div class="stage"><canvas id="game"></canvas><div id="overlay"></div></div>
+<script src="../../common/starx.js"></script><script src="../games.js"></script>
+<script>
+(function () {
+  const G = window.Game, S = window.StarX;
+  const ROW_COLORS = ['#C77DFF', '#9D4EDD', '#7B2CBF', '#FF9F43', '#FF8A00', '#F25C05'];
+  const LEVELS = [
+    r => true,
+    (r, c, cols) => (r + c) % 2 === 0 || r < 2,
+    (r, c, cols) => Math.abs(c - (cols - 1) / 2) <= r + 1,
+  ];
+  let paddle, balls, bricks, drops, score, lives, level, t, mouseX = null, wideT = 0;
+  function build() {
+    bricks = []; const cols = 10, rows = 6, gap = 8, bw = (G.w - 80 - gap * (cols - 1)) / cols, bh = 24;
+    const pattern = LEVELS[(level - 1) % LEVELS.length];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (pattern(r, c, cols))
+      bricks.push({ x: 40 + c * (bw + gap), y: 60 + r * (bh + gap), w: bw, h: bh, color: ROW_COLORS[r], hp: level > 1 && r < 1 ? 2 : 1, hit: 0 });
+  }
+  function serve() { balls = [{ x: paddle.x, y: paddle.y - 14, vx: 0, vy: 0, stuck: true }]; }
+  function reset() { paddle = { x: G.w / 2, y: G.h - 40, w: 120 }; score = 0; lives = 3; level = 1; t = 0; drops = []; build(); serve(); hud(); }
+  function hud() { document.getElementById('score').textContent = score; document.getElementById('lives').innerHTML = '❤️'.repeat(Math.max(0, lives)); document.getElementById('lvl').textContent = level; }
+  function speed() { return 430 + level * 40; }
+  function launch(b) { const a = -Math.PI / 2 + (Math.random() - .5) * .6; b.vx = Math.cos(a) * speed(); b.vy = Math.sin(a) * speed(); b.stuck = false; }
+  function update(dt) {
+    if (G.pressed.has('KeyP') || G.pressed.has('Escape')) return G.pause(true);
+    t += dt;
+    wideT = Math.max(0, wideT - dt); const pw = wideT > 0 ? 190 : 120; paddle.w += (pw - paddle.w) * Math.min(1, dt * 8);
+    if (G.left()) paddle.x -= 700 * dt; else if (G.right()) paddle.x += 700 * dt; else if (mouseX != null) paddle.x += (mouseX - paddle.x) * Math.min(1, dt * 18);
+    paddle.x = Math.max(paddle.w / 2 + 10, Math.min(G.w - paddle.w / 2 - 10, paddle.x)); paddle.y = G.h - 40;
+    if (G.pressed.has('Space')) balls.forEach(b => b.stuck && launch(b));
+    balls.forEach(b => {
+      if (b.stuck) { b.x = paddle.x; b.y = paddle.y - 14; return; }
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.x < 9) { b.x = 9; b.vx = Math.abs(b.vx); } if (b.x > G.w - 9) { b.x = G.w - 9; b.vx = -Math.abs(b.vx); } if (b.y < 9) { b.y = 9; b.vy = Math.abs(b.vy); }
+      if (b.vy > 0 && b.y > paddle.y - 16 && b.y < paddle.y + 6 && Math.abs(b.x - paddle.x) < paddle.w / 2 + 8) {
+        const k = (b.x - paddle.x) / (paddle.w / 2), a = -Math.PI / 2 + k * 1.05, sp = Math.hypot(b.vx, b.vy);
+        b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp; paddle.squash = 1;
+      }
+      for (const br of bricks) {
+        if (br.dead || b.x < br.x - 8 || b.x > br.x + br.w + 8 || b.y < br.y - 8 || b.y > br.y + br.h + 8) continue;
+        const ox = Math.min(b.x - (br.x - 8), br.x + br.w + 8 - b.x), oy = Math.min(b.y - (br.y - 8), br.y + br.h + 8 - b.y);
+        if (ox < oy) b.vx = -b.vx; else b.vy = -b.vy;
+        br.hp--; br.hit = 1;
+        if (br.hp <= 0) { br.dead = true; score += 10 * level; G.burst(br.x + br.w / 2, br.y + br.h / 2, br.color, 16);
+          if (Math.random() < .12) drops.push({ x: br.x + br.w / 2, y: br.y, kind: Math.random() < .5 ? 'wide' : 'multi' }); }
+        hud(); S.spring(document.getElementById('score'), { scale: 1.3 }, { scale: 1 }, { damping: .4 });
+        break;
+      }
+    });
+    drops.forEach(d => { d.y += 170 * dt; if (Math.abs(d.y - paddle.y) < 14 && Math.abs(d.x - paddle.x) < paddle.w / 2 + 10) { d.dead = true;
+      if (d.kind === 'wide') wideT = 10; else { const b0 = balls.find(b => !b.stuck) || balls[0]; for (let i = 0; i < 2; i++) { const nb = { x: b0.x, y: b0.y, stuck: false }; launch(nb); balls.push(nb); } }
+      G.burst(d.x, d.y, '#4FD1FF', 24); } });
+    drops = drops.filter(d => !d.dead && d.y < G.h + 20);
+    balls = balls.filter(b => b.y < G.h + 20);
+    if (!balls.length) { lives--; G.shake = 14; hud(); if (lives <= 0) return over(); serve(); }
+    bricks.forEach(br => { br.hit = Math.max(0, br.hit - dt * 4); });
+    paddle.squash = Math.max(0, (paddle.squash || 0) - dt * 5);
+    if (bricks.every(b => b.dead)) { level++; hud(); build(); serve(); G.screen(`Level ${level}`, 'Nice! The ball gets faster.', '<div class="keys">Space or click to continue</div>'); G.stop(); G.levelPause = true; }
+  }
+  function over() { G.stop(); const rec = G.saveBest(score); G.screen('Game over', `Score <b>${score}</b>${rec ? ' · New best! 🎉' : ''}`, '<button class="btn primary" style="margin-top:12px">Play again</button>'); }
+  function draw(c) {
+    c.clearRect(0, 0, G.w, G.h);
+    bricks.forEach(br => {
+      if (br.dead) return;
+      const s = 1 + br.hit * .12; c.save(); c.translate(br.x + br.w / 2, br.y + br.h / 2); c.scale(s, 1 / s);
+      const g = c.createLinearGradient(0, -br.h / 2, 0, br.h / 2); g.addColorStop(0, br.color); g.addColorStop(1, br.hp > 1 ? '#3C096C' : 'rgba(16,0,43,.8)');
+      c.fillStyle = g; G.roundRect(c, -br.w / 2, -br.h / 2, br.w, br.h, 7); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.28)'; G.roundRect(c, -br.w / 2 + 3, -br.h / 2 + 3, br.w - 6, br.h * .32, 5); c.fill();
+      c.restore();
+    });
+    drops.forEach(d => { c.shadowColor = '#4FD1FF'; c.shadowBlur = 14; c.fillStyle = '#4FD1FF'; G.roundRect(c, d.x - 16, d.y - 8, 32, 16, 8); c.fill(); c.shadowBlur = 0;
+      c.fillStyle = '#10002B'; c.font = '700 11px Inter'; c.textAlign = 'center'; c.fillText(d.kind === 'wide' ? 'WIDE' : '×3', d.x, d.y + 4); });
+    const sq = paddle.squash || 0; c.save(); c.translate(paddle.x, paddle.y); c.scale(1 + sq * .08, 1 - sq * .25);
+    const pg = c.createLinearGradient(-paddle.w / 2, 0, paddle.w / 2, 0); pg.addColorStop(0, '#9D4EDD'); pg.addColorStop(1, '#FF8A00');
+    c.shadowColor = '#FF8A00'; c.shadowBlur = 18; c.fillStyle = pg; G.roundRect(c, -paddle.w / 2, -8, paddle.w, 16, 8); c.fill(); c.restore();
+    balls.forEach(b => { c.shadowColor = '#FFD166'; c.shadowBlur = 20; c.fillStyle = '#FFF1D6'; c.beginPath(); c.arc(b.x, b.y, 8, 0, 6.283); c.fill(); });
+    c.shadowBlur = 0;
+  }
+  G.init('breaker', update, draw);
+  document.getElementById('game').addEventListener('pointermove', e => { const r = e.target.getBoundingClientRect(); mouseX = e.clientX - r.left; });
+  document.getElementById('game').addEventListener('click', () => balls && balls.forEach(b => b.stuck && launch(b)));
+  const begin = () => { reset(); G.start(); };
+  const go = () => { if (G.levelPause) { G.levelPause = false; G.start(); } else if (G.paused) G.pause(false); else begin(); };
+  document.getElementById('overlay').addEventListener('click', go);
+  addEventListener('keydown', e => { if (!G.running && (e.code === 'Space' || e.code === 'Enter')) go(); else if (G.paused && (e.code === 'KeyP' || e.code === 'Space')) G.pause(false); });
+  setTimeout(() => G.screen('Starbreaker', 'Bounce the star ball and smash every glass brick. Catch blue capsules for power-ups!', '<button class="btn primary" style="margin-top:12px">Play</button><div class="keys">Mouse or arrows to move · Space to launch · P to pause</div>'), 50);
+})();
+</script></body></html>

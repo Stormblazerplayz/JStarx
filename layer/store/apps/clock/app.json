@@ -1,0 +1,2 @@
+{ "id": "clock", "name": "Star Clock", "version": "1.0.0", "entry": "index.html", "icon": "icon.svg", "category": "Productivity",
+  "description": "World clock, stopwatch and timer." }

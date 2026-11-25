@@ -84,10 +84,9 @@ class AppHost:
         win.set_default_size(w, h)
         header = Gtk.HeaderBar(title=rec["name"], show_close_button=True)
         header.set_decoration_layout("icon:minimize,maximize,close")
-        icon = self._icon_pixbuf(rec, 22)
+        icon = self._icon_pixbuf(rec, 128)
         if icon:
-            win.set_icon(self._icon_pixbuf(rec, 128))
-            header.pack_start(Gtk.Image.new_from_pixbuf(icon))
+            win.set_icon(icon)  # shown at the left of the title bar ("icon" in the decoration layout)
         win.set_titlebar(header)
         self.header = header
 

@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Star Calc</title>
+<script>document.write(`<link rel="stylesheet" href="${STARX_CONTEXT.web}/common/theme.css"><link rel="stylesheet" href="${STARX_CONTEXT.web}/apps/app.css"><script src="${STARX_CONTEXT.web}/common/starx.js"><\/script>`);</script>
+<style>
+ body{display:grid;place-items:center} .calc{width:360px;padding:22px;border-radius:30px}
+ #disp{font:300 48px var(--font);text-align:right;padding:8px 6px 0;min-height:66px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #expr{text-align:right;color:var(--text-3);min-height:22px;padding:0 6px;font-size:15px}
+ .keys{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+ .keys button{height:62px;border-radius:20px;font-size:22px;font-weight:600;background:rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.15);transition:transform .3s var(--spring)}
+ .keys button:active{transform:scale(.9)} .keys .op{background:linear-gradient(135deg,#9D4EDD,#5A189A)} .keys .eq{background:linear-gradient(135deg,#FFB347,#F25C05);color:#1a0a00} .keys .z{grid-column:span 2}
+</style></head><body>
+<div class="calc glass strong fixed-bg"><div id="expr"></div><div id="disp">0</div><div class="keys" id="keys"></div></div>
+<script>
+(function(){
+ const S=StarX,$=S.$; let expr='';
+ const K=[['C',''],['(',''],[')',''],['÷','op'],['7',''],['8',''],['9',''],['×','op'],['4',''],['5',''],['6',''],['−','op'],['1',''],['2',''],['3',''],['+','op'],['0','z'],['.',''],['=','eq']];
+ $('#keys').innerHTML=K.map(([k,c])=>`<button class="${c}" data-k="${k}">${k}</button>`).join('');
+ function show(v){ $('#disp').textContent=v; }
+ function calc(){ const js=expr.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-'); if(!/^[0-9+\-*/().\s]+$/.test(js)) return 'Error'; try{ const r=Function('"use strict";return ('+js+')')(); return Number.isFinite(r)?String(+r.toFixed(10)):'Error'; }catch(e){ return 'Error'; } }
+ function press(k){ if(k==='C'){expr='';show('0');$('#expr').textContent='';return;} if(k==='='){ const r=calc(); $('#expr').textContent=expr+' ='; show(r); S.spring($('#disp'),{scale:1.12},{scale:1}); expr=r==='Error'?'':r; return;} expr+=k; show(expr); }
+ $('#keys').onclick=e=>{ const b=e.target.closest('button'); if(b) press(b.dataset.k); };
+ document.onkeydown=e=>{ const m={'*':'×','/':'÷','-':'−','Enter':'=','Escape':'C','Backspace':'BS'}; let k=m[e.key]||e.key; if(k==='BS'){expr=expr.slice(0,-1);show(expr||'0');return;} if(/^[0-9+().=C×÷−]$/.test(k)) press(k); };
+})();
+</script></body></html>

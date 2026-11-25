@@ -41,10 +41,10 @@ run() {
   ctl welcome;    snap 09-welcome 3;   ctl close; sleep 1.5
   ctl js desktop "document.querySelector('[data-folder=games]').click()"; snap 10-folder 3
   ctl js desktop "document.querySelector('.fcenter').click()"; sleep 1.5
-  ${EXTRA_STEPS:-true}
+  eval "${EXTRA_STEPS:-true}"
   kill %2 2>/dev/null; sleep 0.5; kill %1 2>/dev/null; sleep 0.5
 }
-export OUT RES LABWC_ARGS
+export OUT RES LABWC_ARGS EXTRA_STEPS
 export -f snap ctl run
 DBUS_CONF="$(dirname "$(dirname "$(readlink -f "$(command -v dbus-daemon)")")")/share/dbus-1/session.conf"
 [ -f "$DBUS_CONF" ] && dbus-run-session --config-file="$DBUS_CONF" -- bash -c run || dbus-run-session -- bash -c run

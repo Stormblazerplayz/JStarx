@@ -1,0 +1,163 @@
+{
+  "name": "Star Store",
+  "featured": "notes",
+  "apps": [
+    {
+      "id": "calc",
+      "name": "Star Calc",
+      "type": "web",
+      "version": "1.0.0",
+      "icon": "calc",
+      "category": "Productivity",
+      "description": "A bouncy calculator with history.",
+      "size": "4 KB",
+      "files": {
+        "app.json": "df33df2af1b07097334046184d4940aba1dfdc281473a8dfbb4ac01f36770282",
+        "icon.svg": "29d7e93c9df0c6dfb1348e565a5e1006858c3c566006497213c8d0697a18cb93",
+        "index.html": "6ae938f1d7a27234ec0c3624afdd5b30567c52c1716a97b4f312149b5015cb5f"
+      }
+    },
+    {
+      "id": "clock",
+      "name": "Star Clock",
+      "type": "web",
+      "version": "1.0.0",
+      "icon": "clock",
+      "category": "Productivity",
+      "description": "World clock, stopwatch and timer.",
+      "size": "5 KB",
+      "files": {
+        "app.json": "6c00ff547d7025cb2e12b41cd950afbf3d65f780db1f85254aafd9396802c401",
+        "icon.svg": "ba7ef57a2450f9726363b6f8a15a34d48dc46d69a39bf981b481ce63e9114d36",
+        "index.html": "c097c059e3ba110444236afe2472d502d62fb396da7cae8b76cf9784b445a8fe"
+      }
+    },
+    {
+      "id": "notes",
+      "name": "Star Notes",
+      "type": "web",
+      "version": "1.0.0",
+      "icon": "notes",
+      "category": "Productivity",
+      "description": "Quick notes that save by themselves.",
+      "size": "4 KB",
+      "files": {
+        "app.json": "20f68df57ccb4c48e9d48d782289408684718c7305d31d26dc9d95459cf5df72",
+        "icon.svg": "6167beb0ab57b39861fbeb86c9fcc9728db6bcedc36d39d904ae1037fce1b28f",
+        "index.html": "c6af4cf8eb163484ebe3f1424dccde5227005e5a020b13a25565a84db2a2af5a"
+      }
+    },
+    {
+      "id": "paint",
+      "name": "Star Paint",
+      "type": "web",
+      "version": "1.0.0",
+      "icon": "paint",
+      "category": "Creative",
+      "description": "Draw with glowing brushes and save to Pictures.",
+      "size": "5 KB",
+      "files": {
+        "app.json": "3e498624ba669791ed2b735f347f303d1828e47b43230fcb55f5db847b6065d3",
+        "icon.svg": "850323a7cc2c6e0912252ba1e4406bf00b114eb2baaee13bd863f8c5f0b2f351",
+        "index.html": "d18685693dd8caaf3db82a016cbf02871838600eb15f68fa983adb345e582c03"
+      }
+    },
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "type": "nix",
+      "nix": "claude-code",
+      "unfree": true,
+      "exec": [
+        "foot",
+        "-e",
+        "claude"
+      ],
+      "app_id": "foot",
+      "icon": "claude",
+      "category": "AI & Code",
+      "size": "≈ 150 MB",
+      "description": "Anthropic's coding assistant in the terminal. Build and fix code by chatting."
+    },
+    {
+      "id": "ai-kit",
+      "name": "Python AI Kit",
+      "type": "nix",
+      "nix": "python3-ai-kit",
+      "nix_expr": "with import <nixpkgs> {}; python3.withPackages (ps: [ ps.torch ps.numpy ps.pandas ps.matplotlib ps.jupyterlab ])",
+      "exec": [
+        "foot",
+        "-e",
+        "jupyter",
+        "lab"
+      ],
+      "app_id": "foot",
+      "icon": "torch",
+      "category": "AI & Code",
+      "size": "≈ 1.5 GB",
+      "description": "PyTorch, NumPy, pandas and JupyterLab for training your own AI models."
+    },
+    {
+      "id": "vscodium",
+      "name": "VSCodium",
+      "type": "nix",
+      "nix": "vscodium",
+      "exec": [
+        "codium"
+      ],
+      "app_id": "codium",
+      "icon": "code",
+      "category": "AI & Code",
+      "size": "≈ 450 MB",
+      "description": "A full code editor for big projects."
+    },
+    {
+      "id": "files",
+      "name": "Files",
+      "type": "nix",
+      "nix": "xfce.thunar",
+      "exec": [
+        "thunar"
+      ],
+      "app_id": "thunar",
+      "icon": "files",
+      "category": "Productivity",
+      "size": "≈ 30 MB",
+      "description": "Browse folders, USB sticks and SD cards."
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "type": "nix",
+      "nix": "gimp",
+      "exec": [
+        "gimp"
+      ],
+      "app_id": "gimp",
+      "icon": "image",
+      "category": "Creative",
+      "size": "≈ 400 MB",
+      "description": "Edit photos and make artwork like a pro."
+    },
+    {
+      "id": "vlc",
+      "name": "VLC",
+      "type": "nix",
+      "nix": "vlc",
+      "exec": [
+        "vlc"
+      ],
+      "app_id": "vlc",
+      "icon": "video",
+      "category": "Fun",
+      "size": "≈ 200 MB",
+      "description": "Play any video or music file."
+    }
+  ],
+  "categories": [
+    "Productivity",
+    "Creative",
+    "AI & Code",
+    "Fun"
+  ]
+}

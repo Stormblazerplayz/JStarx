@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AI Center</title>
+<link rel="stylesheet" href="../../common/theme.css">
+<link rel="stylesheet" href="../app.css">
+<style>
+  body { overflow: auto; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 30px 50px; }
+  .head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .head img { width: 58px; height: 58px; }
+  .head h1 { margin: 0; font-size: 30px; } .head p { margin: 2px 0 0; color: var(--text-2); }
+  .cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; align-items: start; }
+  .job { padding: 16px 18px; border-radius: 20px; margin-bottom: 12px; background: rgba(255,255,255,.055); box-shadow: inset 0 0 0 1px rgba(255,255,255,.09); }
+  .job .top { display: flex; align-items: center; gap: 10px; }
+  .job .nm { font-weight: 750; font-size: 16px; }
+  .job .sub { font-size: 12.5px; color: var(--text-2); margin: 4px 0 10px; }
+  .job .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .tpl { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.06); margin-bottom: 8px; transition: transform .35s var(--spring); }
+  .tpl:hover { background: rgba(255,255,255,.1); transform: translateX(4px); }
+  .tpl .ti { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-grad); color: #1a0a00; flex: none; }
+  .form { display: grid; gap: 10px; }
+  .form label { font-size: 13px; color: var(--text-2); font-weight: 650; display: grid; gap: 5px; }
+  .modal { position: fixed; inset: 0; background: rgba(8, 0, 20, .6); display: flex; align-items: center; justify-content: center; z-index: 20; }
+  .modal .box { width: min(860px, 92vw); max-height: 80vh; padding: 20px; border-radius: 24px; display: flex; flex-direction: column; }
+  .modal pre { flex: 1; overflow: auto; background: rgba(0,0,0,.35); border-radius: 14px; padding: 14px; font: 12.5px/1.5 var(--mono); white-space: pre-wrap; margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><img src="../../icons/ai.svg" alt=""><div class="grow"><h1>AI Center</h1><p>Run and train AI on this Jetson, day and night.</p></div>
+    <div class="row"><span class="faint">24/7 mode</span><button class="toggle" role="switch" id="t247" aria-checked="false"></button></div></div>
+  <div class="big-stat" style="--n:4" id="stats"></div>
+  <div class="cols">
+    <section><div class="panel-title" style="margin:6px 4px 10px;font-size:13px;font-weight:750;letter-spacing:.08em;color:var(--text-3)">JOBS</div><div id="jobs"></div></section>
+    <aside>
+      <section class="card pad"><h2 style="margin-top:0">Start something new</h2><div id="tpls"></div><div id="form"></div></section>
+      <section class="card pad"><h2 style="margin-top:0">Keep it cool</h2>
+        <div class="item" style="border:0"><div class="txt"><div class="t">Pause jobs above</div><div class="s">Jobs pause when the Jetson gets this hot and continue when it cools down.</div></div>
+        <div class="ctl"><input type="range" class="slider" id="tl" min="55" max="90" step="1" style="width:120px"><span class="val" id="tl-v"></span></div></div></section>
+    </aside>
+  </div>
+</div>
+<script src="../../common/starx.js"></script>
+<script src="ai.js"></script>
+</body>
+</html>

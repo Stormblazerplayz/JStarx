@@ -1,0 +1,6 @@
+*.pyc
+*.qcow2
+/test-out/
+__pycache__/
+result
+result-*
