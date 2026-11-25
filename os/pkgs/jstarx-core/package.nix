@@ -5,7 +5,7 @@ let
 in
 stdenv.mkDerivation {
   pname = "jstarx-core";
-  version = "2.0.0";
+  version = "2.0.1";
   src = ./.;
   dontBuild = true;
   installPhase = ''

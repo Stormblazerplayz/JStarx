@@ -1,6 +1,6 @@
 {
   "name": "JStarx Layer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "codename": "Supernova",
   "released": "2026-11-25",
   "notes": [
@@ -8,6 +8,7 @@
     "Full-screen apps whose title bars curve around the Dynamic Island (JStarx apps and Firefox)",
     "Hover the island to open it: Today and Memory tabs",
     "Memory page in Settings: up to 12 GB usable (4 GB RAM + up to 8 GB swap), Free up now, Memory saver",
+    "Memory saver keeps only what is in use in RAM: idle apps and background services move to swap, half of the RAM stays free",
     "Power modes: Low power, Power saver, Balanced, Performance and Extreme, plus fan control",
     "Spark 1 runs Storm's own model, with a Faster answers option",
     "Whole-system updates from GitHub, auto-repair with a boot safety net, wireless display casting",

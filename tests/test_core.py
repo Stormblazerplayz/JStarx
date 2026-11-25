@@ -303,18 +303,95 @@ def test_memory_details_has_ram_and_swap():
     assert all({"name", "ram", "swap"} <= set(a) for a in m["apps"])
 
 
-def test_free_memory_asks_the_kernel_to_swap_idle_apps(sysroot, monkeypatch, tmp_path):
-    cg = tmp_path / "user.slice"
-    cg.mkdir()
-    (cg / "memory.reclaim").write_text("")
-    monkeypatch.setenv("JSTARX_USER_CGROUP", str(cg))
+def fake_cgroups(tmp_path, monkeypatch, pressure=0.0, current=1 << 30):
+    root = tmp_path / "cgroup"
+    for name in ("user.slice", "system.slice"):
+        cg = root / name
+        cg.mkdir(parents=True)
+        (cg / "memory.reclaim").write_text("")
+        (cg / "memory.current").write_text(f"{current}\n")
+        (cg / "memory.pressure").write_text(f"some avg10={pressure:.2f} avg60=0.00 avg300=0.00 total=1\n"
+                                            "full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
+    monkeypatch.delenv("JSTARX_USER_CGROUP", raising=False)
+    monkeypatch.delenv("JSTARX_SYSTEM_CGROUP", raising=False)
+    monkeypatch.setenv("JSTARX_CGROUP_ROOT", str(root))
+    return root
+
+
+def asked(root, name):
+    text = (root / name / "memory.reclaim").read_text()
+    return int(text) if text else 0
+
+
+def test_free_memory_moves_idle_apps_then_services_to_swap(sysroot, monkeypatch, tmp_path):
+    root = fake_cgroups(tmp_path, monkeypatch)
     starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 1 << 30})
     res = starxd.op_memory_free()
-    assert int((cg / "memory.reclaim").read_text()) >= 16 << 20
-    assert "freed" in res and res["total"] > 0
+    # 60% of 4 GB should be free: ~1.4 GB more, asked from the apps first, then background services
+    assert asked(root, "user.slice") == int(4 * 0.6 * (1 << 30)) - (1 << 30)
+    assert asked(root, "system.slice") == asked(root, "user.slice")  # the fake RAM did not get freer
+    assert "freed" in res and res["total"] == 4 << 30
     assert starxd.op_memory_saver(False) == {"on": False}
     assert starxd.op_memory_saver() == {"on": False}
     assert starxd.op_memory_saver(True) == {"on": True}
+
+
+def test_free_memory_stops_once_enough_is_free(sysroot, monkeypatch, tmp_path):
+    root = fake_cgroups(tmp_path, monkeypatch)
+    starxd = fresh("jstarx_core.starxd")
+    state = {"avail": 1 << 30}
+
+    def meminfo():
+        return {"MemTotal": 4 << 30, "MemAvailable": state["avail"]}
+
+    real = starxd.reclaim
+
+    def reclaim(n, cg=None, minimum=16 << 20):
+        state["avail"] += n  # the kernel freed all of it
+        return real(n, cg, minimum)
+
+    monkeypatch.setattr(starxd, "_meminfo", meminfo)
+    monkeypatch.setattr(starxd, "reclaim", reclaim)
+    starxd.free_ram(3 << 30)
+    assert asked(root, "user.slice") == 2 << 30 and asked(root, "system.slice") == 0
+
+
+def test_memory_saver_is_gentle_with_ai_jobs(sysroot, monkeypatch, tmp_path):
+    # the automatic saver takes at most 256 MB per pass from background services (Spark, StarAI) ...
+    root = fake_cgroups(tmp_path, monkeypatch)
+    starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 1 << 30})
+    starxd.free_ram(2 << 30, gentle=True)
+    assert asked(root, "user.slice") == 1 << 30 and asked(root, "system.slice") == 256 << 20
+    # ... and leaves a group alone while its programs are waiting for memory
+    root2 = fake_cgroups(tmp_path / "busy", monkeypatch, pressure=5.0)
+    starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 1 << 30})
+    starxd.free_ram(2 << 30, gentle=True)
+    assert asked(root2, "user.slice") == 0 and asked(root2, "system.slice") == 0
+
+
+def test_sweep_moves_a_little_idle_memory_and_backs_off(sysroot, monkeypatch, tmp_path):
+    root = fake_cgroups(tmp_path, monkeypatch)
+    starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 3 << 30, "SwapFree": 2 << 30})
+    assert starxd.sweep() == 2 * ((1 << 30) // 50)  # 2% of each group (about 20 MB)
+    assert asked(root, "user.slice") == (1 << 30) // 50 and asked(root, "system.slice") == (1 << 30) // 50
+    # programs waiting for memory: leave that group alone
+    root2 = fake_cgroups(tmp_path / "busy", monkeypatch, pressure=3.5)
+    starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 3 << 30, "SwapFree": 2 << 30})
+    assert starxd.sweep() == 0 and asked(root2, "user.slice") == 0
+    # swap is full: nothing to do
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"MemTotal": 4 << 30, "MemAvailable": 3 << 30, "SwapFree": 0})
+    assert starxd.sweep() == 0
+    # a big group: at most 64 MB per sweep
+    root3 = fake_cgroups(tmp_path / "big", monkeypatch, current=8 << 30)
+    starxd = fresh("jstarx_core.starxd")
+    monkeypatch.setattr(starxd, "_meminfo", lambda: {"SwapFree": 2 << 30})
+    starxd.sweep()
+    assert asked(root3, "system.slice") == 64 << 20
 
 
 # ---------------------------------------------------------------- Spark: faster answers

@@ -250,7 +250,7 @@ in
     '';
   };
   boot.kernel.sysctl = {
-    "vm.swappiness" = 150;              # swap idle app memory out aggressively (0-200)
+    "vm.swappiness" = 200;              # the most the kernel allows: idle memory goes to swap first (0-200)
     "vm.watermark_scale_factor" = 125;  # start freeing memory before it runs out
     "vm.page-cluster" = 0;              # zram works best one page at a time
     "vm.dirty_writeback_centisecs" = 1500;  # write to the SD card in bigger, rarer batches

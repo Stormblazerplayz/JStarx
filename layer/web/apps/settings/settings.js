@@ -219,9 +219,9 @@
       card('Where your memory is', bar('RAM', ram.used, ram.total, 'The Jetson\'s fast memory') +
         bar('Compressed RAM', z.used, z.total, ratio ? `Idle apps squeezed ${ratio}× so more fits` : 'Idle apps get squeezed here first') +
         bar('Swap file', sf.used, sf.total, 'On the SD card or SSD: idle apps wait here')) +
-      card('Keep RAM free', item('Memory saver', 'Moves apps you are not using out of RAM early, so the app you are using stays fast.',
+      card('Keep RAM free', item('Memory saver', 'Keeps only what is in use in RAM: idle apps and background services move to swap, and half of the RAM stays free.',
         `<button class="toggle" role="switch" aria-checked="${saver.on !== false}" id="mem-saver"></button>`) +
-        item('Free up memory now', 'Moves idle app memory out of RAM right now.', `<button class="btn small primary" id="mem-free">${S.icon('bolt')} Free up</button>`)) +
+        item('Free up memory now', 'Moves idle apps and background services out of RAM right now.', `<button class="btn small primary" id="mem-free">${S.icon('bolt')} Free up</button>`)) +
       card('Apps using memory', apps || '<div class="faint" style="padding:12px 0">Nothing yet</div>');
   }
   setInterval(() => { if (current === 'memory' && !document.hidden) render(true); }, 4000);

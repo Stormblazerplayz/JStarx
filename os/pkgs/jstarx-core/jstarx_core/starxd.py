@@ -85,7 +85,18 @@ def op_password_set(old, new, _uid=None):
 
 
 # ---------------------------------------------------------------- memory: keep RAM free
-CGROUP_USER = os.environ.get("JSTARX_USER_CGROUP", "/sys/fs/cgroup/user.slice")
+# JStarx keeps only the memory that is in use in RAM. Everything idle (apps you are not using
+# and background services) moves to swap: compressed RAM first (fast), then the swap file on
+# the SD card / SSD. The code that is running and the data it is using have to stay in RAM
+# (the CPU can only work on RAM), so most of it can move to swap, never all of it.
+CGROUP_ROOT = os.environ.get("JSTARX_CGROUP_ROOT", "/sys/fs/cgroup")
+CGROUP_USER = os.environ.get("JSTARX_USER_CGROUP", os.path.join(CGROUP_ROOT, "user.slice"))
+CGROUP_SYSTEM = os.environ.get("JSTARX_SYSTEM_CGROUP", os.path.join(CGROUP_ROOT, "system.slice"))
+TRIGGER_FREE = 0.45    # memory saver: when less than 45% of the RAM is free ...
+KEEP_FREE = 0.50       # ... move idle memory to swap until half of it is free
+SWEEP_SHARE = 50       # every 30 s, move 1/50 (2%) of each group's memory that nobody is using
+PRESSURE_LIMIT = 0.2   # a group that waited for memory more than 0.2% of the last 10 s is left alone
+MIN_SWAP_FREE = 128 << 20
 
 
 def _meminfo():
@@ -101,23 +112,78 @@ def _meminfo():
     return vals
 
 
-def reclaim(nbytes):
-    """Move up to nbytes of the least-used app memory out of RAM (into compressed RAM / the swap file)."""
-    nbytes = int(max(16 << 20, min(nbytes, 2 << 30)))
-    path = os.path.join(CGROUP_USER, "memory.reclaim")
+def _cg_value(cg, name):
     try:
-        with open(path, "w") as f:
+        with open(os.path.join(cg, name)) as f:
+            return int(f.read().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 0
+
+
+def _pressure(cg):
+    """How much of the last 10 s the programs in a group waited for memory (PSI "some avg10", in %)."""
+    try:
+        with open(os.path.join(cg, "memory.pressure")) as f:
+            for line in f:
+                if line.startswith("some "):
+                    for part in line.split():
+                        if part.startswith("avg10="):
+                            return float(part[6:])
+    except (OSError, ValueError):
+        pass
+    return 0.0
+
+
+def reclaim(nbytes, cg=None, minimum=16 << 20):
+    """Move up to nbytes of the least-used memory of a group (apps by default) out of RAM
+    (into compressed RAM, then the swap file)."""
+    nbytes = int(max(minimum, min(nbytes, 2 << 30)))
+    try:
+        with open(os.path.join(cg or CGROUP_USER, "memory.reclaim"), "w") as f:
             f.write(str(nbytes))
         return True
     except OSError:  # the kernel could not free that much right now (or no cgroup support): fine
         return False
 
 
+def free_ram(target, gentle=False):
+    """Move idle memory to swap until `target` bytes of RAM are free: apps first, then background
+    services. gentle (the automatic memory saver): a group whose programs are waiting for memory is
+    skipped, and background services (Spark, StarAI jobs) give at most 256 MB per pass, so AI jobs
+    that are using their memory keep running fast."""
+    for cg in (CGROUP_USER, CGROUP_SYSTEM):
+        need = target - _meminfo().get("MemAvailable", 0)
+        if need <= 0:
+            break
+        if gentle:
+            if _pressure(cg) > PRESSURE_LIMIT:
+                continue
+            if cg == CGROUP_SYSTEM:
+                need = min(need, 256 << 20)
+        reclaim(need, cg)
+
+
+def sweep():
+    """Move memory nobody is using to swap, a little at a time (the way big servers do it): 2% of
+    the background services and 2% of the apps. A group whose programs had to wait for memory is
+    left alone, so what is in use stays in RAM. Returns how many bytes it asked the kernel to move."""
+    if _meminfo().get("SwapFree", 0) < MIN_SWAP_FREE:
+        return 0  # swap is full: nothing more can go there
+    moved = 0
+    for cg in (CGROUP_SYSTEM, CGROUP_USER):
+        cur = _cg_value(cg, "memory.current")
+        if cur < (64 << 20) or _pressure(cg) > PRESSURE_LIMIT:
+            continue
+        step = max(4 << 20, min(cur // SWEEP_SHARE, 64 << 20))
+        if reclaim(step, cg, minimum=4 << 20):
+            moved += step
+    return moved
+
+
 def op_memory_free():
-    before = _meminfo().get("MemAvailable", 0)
-    total = _meminfo().get("MemTotal", 1)
-    target = max(256 << 20, int(total * 0.6) - before)  # aim for 60% of RAM free
-    reclaim(target)
+    m = _meminfo()
+    before, total = m.get("MemAvailable", 0), m.get("MemTotal", 1)
+    free_ram(max(int(total * 0.6), before + (256 << 20)))  # aim for 60% of RAM free (at least 256 MB more)
     try:
         with open("/proc/sys/vm/compact_memory", "w") as f:
             f.write("1")
@@ -134,7 +200,9 @@ def op_memory_saver(on=None):
 
 
 def memory_saver_loop():
-    """Every 15 s: when less than 35% of RAM is free, push idle app memory to swap (aggressive).
+    """Memory saver (on unless turned off in Settings > Memory):
+    every 15 s, when less than 45% of the RAM is free, move idle memory to swap until half is free;
+    otherwise every 30 s, sweep a little memory nobody is using into swap.
     Every 5 s: keep the fan at full speed if Extreme / fan Max is on."""
     tick = 0
     while True:
@@ -151,8 +219,10 @@ def memory_saver_loop():
                 continue
             m = _meminfo()
             total, avail = m.get("MemTotal", 0), m.get("MemAvailable", 0)
-            if total and avail < total * 0.35:
-                reclaim(int(total * 0.40) - avail)
+            if total and avail < total * TRIGGER_FREE:
+                free_ram(int(total * KEEP_FREE), gentle=True)
+            elif tick % 6 == 0:
+                sweep()
         except Exception as e:  # never let this stop starxd
             log("memory saver:", e)
 

@@ -25,7 +25,7 @@ animations, and it is built to run AI 24/7.
 | **Auto repair** | Fixes damaged files at every start, undoes an update if the desktop keeps crashing, Safe Mode, and goes back to the last working system if a new one can't start |
 | **Wireless display** | Cast the screen to a Miracast TV or a Chromecast; with no screen plugged in, JStarx finds a wireless display by itself |
 | **Full-screen apps** | Apps open full screen; the title bars of JStarx apps and Firefox curve around the Dynamic Island, and hovering the island opens it (Today and Memory tabs) |
-| **Up to 12 GB memory** | 4 GB RAM + a swap file of up to 8 GB (a quarter of the card: 32 GB cards get the full 8 GB); idle app memory moves to compressed RAM, then to the swap file, so RAM stays free. Settings → Memory and the island's Memory tab show it |
+| **Up to 12 GB memory** | 4 GB RAM + a swap file of up to 8 GB (a quarter of the card: 32 GB cards get the full 8 GB); only what is in use stays in RAM: idle apps and background services move to compressed RAM, then to the swap file, and half of the RAM stays free. Settings → Memory and the island's Memory tab show it |
 | **Power modes** | Low power, Power saver, Balanced, Performance and Extreme (everything at full speed, fan at max); screen dimming and screen off; zram |
 | **Fan** | The StarX Kernel drives the Nano's fan from the temperature; Settings → Power → Fan: Auto or Max |
 
@@ -35,9 +35,10 @@ No bloatware: the system only has what JStarx needs. Everything else is in the S
 
 You need: a Jetson Nano Developer Kit, a microSD card (32 GB or bigger is best), and a PC.
 
-1. **Get the image.** Open the **Actions** tab of this repo, pick **Build JStarx OS image**, press
-   **Run workflow**, wait for it to finish (about an hour), and download `jstarx-sd-image`.
-   (Releases also have it when a version tag is pushed.) You get `jstarx-2.0.0-jetson-nano.img.xz`.
+1. **Get the image.** Download `jstarx-2.0.1-jetson-nano.img.xz` from the
+   [latest release](https://github.com/Stormblazerplayz/JStarx/releases/latest). Every push to
+   main builds a new release (about an hour); every build also keeps the file in the run's
+   **Artifacts** (Actions tab → **Build JStarx OS image**).
 2. **Flash it.** Open [balenaEtcher](https://etcher.balena.io), pick the `.img.xz` file, pick your
    SD card, press **Flash**.
 3. **Start it.** Put the card in the Jetson, plug in a screen (or don't, see below), keyboard,
@@ -103,7 +104,7 @@ and add `extra-platforms = aarch64-linux` to `/etc/nix/nix.conf`.
 Test the image in QEMU (needs `qemu-system-aarch64` and the `u-boot-qemu` package):
 
 ```bash
-python3 tools/qemu-test.py result-sd/sd-image/jstarx-2.0.0-jetson-nano.img
+python3 tools/qemu-test.py result-sd/sd-image/jstarx-2.0.1-jetson-nano.img
 ```
 
 Run the unit tests:

@@ -20,7 +20,7 @@
   "bin/starx-claude": "7c8af3c399195b6a59c8aa56d5aafb6022aee5981304431c7a496ab09a0d6c0c",
   "bin/starx-ctl": "0b406603113e4058a6a73020f9e4656d7ebac33409d2dd987809f4a93263ecb4",
   "bin/starx-shell": "922330c15b8e038da8208e7e908299f9bab12d1ae142a19a97b257968f887dcf",
-  "layer.json": "22ff52dccd190291d0d7fb8a0d099cb667e94e40ce320259a6cf7406d97e6cd0",
+  "layer.json": "881ba7e778cb81427c3930b3a7dd1c14944dad1f19a05a72358dae3ba2b0db95",
   "starx/__init__.py": "d2360b67eebc32e5ec0c9be6f3e05b2fe29659e98d52af2776f64c8f4567c83e",
   "starx/api.py": "2b0cfc6f249cbb01d00f3580f778e73f3f81570bd5df667a6da88dc526eda083",
   "starx/app.py": "1cde89e6943d53b39928d1bc45a6eeb4b5371e51da3b6ef16541c530b46a4a15",
@@ -53,7 +53,7 @@
   "web/apps/ai/index.html": "de8dce1beffcea1e653ad1cf125c124f463545af93f7031241724c25bbe1d601",
   "web/apps/app.css": "57d7768bb53b2f0b1386cc626493b87056a6f48174e1739d722d831acc53c8e4",
   "web/apps/settings/index.html": "6014d268104a1059c9da807b92910b30ebec1643e1f53a35393ac206fac95231",
-  "web/apps/settings/settings.js": "68fffb9c0a9963d3f8b0548dec6dc5512675514d5cdc03486b747c0482ceaad8",
+  "web/apps/settings/settings.js": "3085df1c8b31eda5c67d89f99f956e1ebe30ffbaf3bcab9bd5a332f654b11c76",
   "web/apps/spark/index.html": "6231bf854f75de250b919e12dbaba21a5aef7fd970d39dcc3396324ff9e7078a",
   "web/apps/store/index.html": "2c9030ba29fd29f27789ef3cad388a53cba2d6e5fcbe9d858c950561002ee1f5",
   "web/apps/store/store.js": "2d62fb6b2c2a57e3c334d64c2bfce532a7cfb835923329f0e1255b4119bd6084",
@@ -98,5 +98,5 @@
   "web/shell/overlay.js": "e47512eb156e353086626782d205e689361f8a91d5066feac5491d3bc86a7bfd",
   "web/shell/shell.css": "a00a7721508135172c743035a8b00893d760c081499d71ea8e3e327108398e63"
  },
- "version": "2.0.0"
+ "version": "2.0.1"
 }
