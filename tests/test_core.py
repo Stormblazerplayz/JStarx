@@ -266,3 +266,29 @@ def test_spark_direct_link_and_bad_link():
 def test_layer_manifest_is_current():
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "make_manifest.py"), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout
+
+
+# ---------------------------------------------------------------- Settings -> change password
+def test_password_change_needs_the_current_password(sysroot, monkeypatch, tmp_path):
+    import pwd
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    chk = bin_dir / "unix_chkpwd"
+    chk.write_text(f"#!{sys.executable}\nimport sys\nsys.exit(0 if sys.stdin.buffer.read() == b'jstarx\\0' else 1)\n")
+    chp = bin_dir / "chpasswd"
+    chp.write_text(f"#!{sys.executable}\nimport sys\nopen({str(tmp_path / 'chpasswd.out')!r}, 'wb').write(sys.stdin.buffer.read())\n")
+    for f in (chk, chp):
+        f.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    monkeypatch.setenv("JSTARX_UNIX_CHKPWD", str(chk))
+    starxd = fresh("jstarx_core.starxd")
+    nobody = pwd.getpwnam("nobody").pw_uid
+    with pytest.raises(ValueError):
+        starxd.op_password_set("wrong", "newpass1", _uid=nobody)
+    assert not (tmp_path / "chpasswd.out").exists()
+    with pytest.raises(ValueError):
+        starxd.op_password_set("jstarx", "a:b\nroot:x", _uid=nobody)  # can't sneak in another user
+    with pytest.raises(PermissionError):
+        starxd.op_password_set("jstarx", "newpass1", _uid=0)
+    assert starxd.op_password_set("jstarx", "newpass1", _uid=nobody)["changed"]
+    assert (tmp_path / "chpasswd.out").read_text() == "nobody:newpass1\n"

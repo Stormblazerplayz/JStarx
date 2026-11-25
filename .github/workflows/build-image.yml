@@ -1,0 +1,62 @@
+# Builds the JStarx OS SD card image for the Jetson Nano.
+# Run it from the Actions tab ("Run workflow"), or push a tag like v1.0.0 to also publish a release.
+name: Build JStarx OS image
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  sd-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make room on the disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+          df -h /
+
+      - name: Let this PC run ARM64 programs (QEMU)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            extra-platforms = aarch64-linux
+
+      - name: Run the JStarx tests
+        run: |
+          nix-shell -p 'python3.withPackages (ps: [ ps.pytest ps.numpy ])' --run 'python -m pytest -q tests'
+
+      - name: Build the SD card image (StarX Kernel + JStarx OS)
+        run: nix-build -A sdImage -o result-sd
+
+      - name: Compress the image
+        run: |
+          version=$(jq -r .version layer/layer.json)
+          mkdir out
+          xz -T0 -6 -c result-sd/sd-image/*.img > "out/jstarx-${version}-jetson-nano.img.xz"
+          (cd out && sha256sum * > SHA256SUMS)
+          ls -lh out
+
+      - name: Save the image
+        uses: actions/upload-artifact@v4
+        with:
+          name: jstarx-sd-image
+          path: out/
+          compression-level: 0
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*

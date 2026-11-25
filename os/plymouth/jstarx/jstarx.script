@@ -21,7 +21,8 @@ glow_image = Image("glow.png");
 glow = Sprite(glow_image);
 glow.SetZ(5);
 
-title = Sprite(Image.Text("JStarx", 1, 1, 1, 1, "Sans Bold 30"));
+title_image = Image.Text("JStarx", 1, 1, 1, 1, "Sans Bold 30");
+title = Sprite(title_image);
 title.SetZ(10);
 title.SetOpacity(0);
 
@@ -37,9 +38,11 @@ fill.SetY(H * 0.72);
 fill.SetZ(11);
 
 dot_image = Image("dot.png");
-for (i = 0; i < 3; i++) {
+i = 0;
+while (i < 3) {
   dots[i] = Sprite(dot_image);
   dots[i].SetZ(10);
+  i = i + 1;
 }
 
 message = Sprite();
@@ -75,14 +78,16 @@ fun refresh() {
   if (a < 0) a = 0;
   if (a > 1) a = 1;
   title.SetOpacity(a);
-  title.SetX(cx - title.GetImage().GetWidth() / 2);
+  title.SetX(cx - title_image.GetWidth() / 2);
   title.SetY(cy + size / 2 + 18);
-  for (i = 0; i < 3; i++) {
+  i = 0;
+  while (i < 3) {
     p = Math.Sin(global.t * 4.5 - i * 0.9);
     if (p < 0) p = 0;
     dots[i].SetX(cx - 30 + i * 24);
     dots[i].SetY(H * 0.72 + 26 - p * 8);
     dots[i].SetOpacity(0.25 + 0.75 * p);
+    i = i + 1;
   }
 }
 Plymouth.SetRefreshFunction(refresh);
@@ -101,4 +106,3 @@ fun message_cb(text) {
   message.SetY(H * 0.72 + 52);
 }
 Plymouth.SetMessageFunction(message_cb);
-Plymouth.SetUpdateStatusFunction(message_cb);

@@ -34,7 +34,8 @@ in
       RequiresMountsFor = "/sysroot/boot";
       DefaultDependencies = false;
     };
-    before = [ "initrd.target" "shutdown.target" ];
+    # run before the system is started, so a build that crashes is always counted
+    before = [ "initrd.target" "shutdown.target" "initrd-find-nixos-closure.service" "initrd-nixos-activation.service" ];
     conflicts = [ "shutdown.target" ];
     wantedBy = [ "initrd.target" ];
     serviceConfig = {
@@ -56,9 +57,9 @@ in
       tries=$((tries + 1))
       echo "$tries" > "$J/tries"
       good="$(cat "$J/known-good" 2>/dev/null | tr -cd 0-9)"
-      echo "JStarx: starting build ''${gen:-?} (try $tries, last working build: ''${good:-none})"
+      echo "<6>JStarx: starting build ''${gen:-?} (try $tries, last working build: ''${good:-none})" > /dev/kmsg
       if [ -n "$gen" ] && [ -n "$good" ] && [ "$gen" != "$good" ] && [ "$tries" -ge 3 ] && [ -f "$conf" ]; then
-        echo "JStarx auto-repair: build $gen did not start $((tries - 1)) times, going back to build $good"
+        echo "<2>JStarx auto-repair: build $gen did not start $((tries - 1)) times, going back to build $good" > /dev/kmsg
         if command -v plymouth >/dev/null; then
           plymouth display-message --text="Auto-repair: going back to build $good" || true
         fi

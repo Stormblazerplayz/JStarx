@@ -1,5 +1,6 @@
 *.pyc
 *.qcow2
+.pytest_cache/
 /test-out/
 __pycache__/
 result

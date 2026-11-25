@@ -192,6 +192,7 @@
 
   async function pageUsers() {
     return card('You', item('Your name', 'Used in greetings and the start menu.', `<input class="field" id="uname" value="${esc(get('user.name'))}" style="width:200px"><button class="btn small" id="uname-save">Save</button>`) +
+      item('Password', 'Used to log in and to approve system changes.', `<input class="field" type="password" id="pw-old" placeholder="Current" autocomplete="current-password" style="width:130px"><input class="field" type="password" id="pw-new" placeholder="New" autocomplete="new-password" style="width:130px"><button class="btn small" id="pw-save">Change</button>`) +
       item('Log in automatically', 'Skip the password screen when the Jetson starts.', `<button class="btn small" data-sys="autologin" data-v="true">On</button><button class="btn small" data-sys="autologin" data-v="false">Off</button>`)) +
       card('Remote access', item('SSH', 'Lets you log in to this Jetson from another computer on your network.', `<button class="btn small" data-sys="ssh" data-v="true">On</button><button class="btn small" data-sys="ssh" data-v="false">Off</button>`)) +
       card('Privacy', item('No tracking', 'JStarx sends nothing about you anywhere. Updates only download files from your GitHub repo.', S.icon('shield')));
@@ -253,6 +254,13 @@
       case 'branch-save': await call('update.config', { branch: $('#branch').value.trim() || 'main' }, 'Saved'); return render(true);
       case 'reset-settings': { const s = await call('settings.reset'); if (s) S.applySettings(s); S.toast('Settings reset'); return render(true); }
       case 'clean': t.disabled = true; t.textContent = 'Cleaning…'; { const r = await call('storage.clean'); if (r) S.toast(`Freed ${S.bytes(r.freed || 0)}`); } return render(true);
+      case 'pw-save': {
+        const o = $('#pw-old').value, n = $('#pw-new').value;
+        if (n.length < 4) { S.toast('The new password needs at least 4 characters'); return; }
+        const r = await call('system.password', { old: o, new: n }, null);
+        if (r && r.changed) { $('#pw-old').value = ''; $('#pw-new').value = ''; S.toast('Password changed'); }
+        return;
+      }
       case 'uname-save': return setSetting('user.name', $('#uname').value.trim().slice(0, 24) || 'Friend');
       case 'tz-save': return call('system.set', { key: 'timezone', value: $('#tz').value }, 'Time zone set');
     }

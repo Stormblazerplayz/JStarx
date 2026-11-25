@@ -51,14 +51,21 @@ in
   # ------------------------------------------------------------------ StarX Kernel + hardware
   boot.kernelPackages = pkgs.linuxPackagesFor starxKernel;
   boot.initrd.includeDefaultModules = false;
-  boot.initrd.availableKernelModules = [ ];
+  boot.initrd.availableKernelModules = [ ];   # everything needed to start is built into the kernel
+  # if anything freezes while starting, the watchdog restarts the Jetson (and auto-repair counts it)
+  boot.initrd.systemd.settings.Manager.RuntimeWatchdogSec = "60s";
+  boot.initrd.systemd.tpm2.enable = false;   # no TPM chip on the Jetson Nano
+  systemd.tpm2.enable = false;
   boot.kernelParams = [
     "console=ttyS0,115200n8" "console=ttyAMA0,115200" "console=tty1"
     "quiet" "splash" "loglevel=3" "udev.log_level=3" "vt.global_cursor_default=0"
     "fbcon=logo-pos:center" "fbcon=logo-count:1" "panic=10" "boot.panic_on_fail"
+    # show the boot screen on the display even though serial consoles are listed above
+    "plymouth.ignore-serial-consoles"
   ];
   hardware.firmware = [ J.jstarx-firmware ];
   hardware.enableRedistributableFirmware = false;   # we ship only what the Jetson needs
+  hardware.firmwareCompression = "none";            # the StarX Kernel loads plain firmware files
   hardware.graphics.enable = true;
   hardware.bluetooth.enable = true;
   hardware.deviceTree.enable = true;
@@ -225,7 +232,8 @@ in
     description = "JStarx system helper";
     wantedBy = [ "multi-user.target" ];
     after = [ "jstarx-repair.service" ];
-    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip ];
+    path = with pkgs; [ systemd nix coreutils util-linux gnutar gzip shadow ];
+    environment.JSTARX_UNIX_CHKPWD = "${pkgs.pam}/bin/unix_chkpwd";
     serviceConfig = { ExecStart = "${core}/bin/starxd"; Restart = "always"; RestartSec = 2; };
   };
 

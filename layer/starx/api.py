@@ -206,6 +206,9 @@ class Api:
             raise ValueError("unknown system setting")
         return daemon.starxd("system_set", key=key, value=value)
 
+    def m_system_password(self, old, new, view=None):
+        return daemon.starxd("password_set", timeout=60, old=old, new=new)
+
     # ------------------------------------------------------------------ per-app storage (notes, high scores...)
     def _appdata_path(self):
         safe = "".join(c for c in (self.app_id or "shell") if c.isalnum() or c in "-_")

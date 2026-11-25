@@ -10,6 +10,7 @@ import pwd
 import socket
 import socketserver
 import struct
+import subprocess
 import threading
 import time
 
@@ -17,6 +18,7 @@ from . import boot, layers, power, repair, spark, updater
 from .common import STATE, log, read_json, run, status, write_json
 
 SOCKET = os.environ.get("STARXD_SOCKET", "/run/starxd.sock")
+UNIX_CHKPWD = os.environ.get("JSTARX_UNIX_CHKPWD", "unix_chkpwd")
 FLAGS = os.path.join(STATE, "flags")
 _update_lock = threading.Lock()
 
@@ -60,6 +62,28 @@ def op_system_set(key, value):
     raise ValueError("unknown setting")
 
 
+def op_password_set(old, new, _uid=None):
+    """Change the caller's own password. The current password has to be right."""
+    if not _uid:
+        raise PermissionError("only a signed-in user can change their password")
+    user = pwd.getpwuid(_uid).pw_name
+    old, new = str(old), str(new)
+    if len(new) < 4:
+        raise ValueError("the new password needs at least 4 characters")
+    if any(c in new for c in ":\n\r\0"):
+        raise ValueError("the new password can't contain : or line breaks")
+    chk = subprocess.run([UNIX_CHKPWD, user, "nullok"], input=old.encode() + b"\0",
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+    if chk.returncode != 0:
+        raise ValueError("the current password is not right")
+    r = subprocess.run(["chpasswd"], input=f"{user}:{new}\n".encode(), stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE, timeout=30)
+    if r.returncode != 0:
+        raise RuntimeError("could not change the password")
+    log("password changed for", user)
+    return {"user": user, "changed": True}
+
+
 def op_storage_clean():
     before = os.statvfs("/")
     run(["nix-collect-garbage", "--delete-older-than", "14d"], timeout=3600)
@@ -101,34 +125,47 @@ OPS = {
     "spark_import": lambda path: spark.import_file(path),
     "spark_service": lambda action, threads=None, ctx=None: (spark.set_cfg(threads, ctx), spark.service(action))[1],
     "boot_info": boot.info,
+    "password_set": op_password_set,
 }
+# operations that are told which user is asking (never taken from the request itself)
+NEEDS_UID = {"password_set"}
 
 
-def peer_ok(sock):
+def peer_uid(sock):
+    """The user id of the program on the other end, or None if it isn't allowed to ask."""
     try:
         _pid, uid, gid = struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))
     except OSError:
-        return False
+        return None
     if uid == 0:
-        return True
+        return uid
     try:
         g = grp.getgrnam("jstarx")
-        return gid == g.gr_gid or pwd.getpwuid(uid).pw_name in g.gr_mem
+        return uid if (gid == g.gr_gid or pwd.getpwuid(uid).pw_name in g.gr_mem) else None
     except KeyError:
-        return False
+        return None
+
+
+def peer_ok(sock):
+    return peer_uid(sock) is not None
 
 
 class Handler(socketserver.StreamRequestHandler):
     def handle(self):
-        if not peer_ok(self.request):
+        uid = peer_uid(self.request)
+        if uid is None:
             self.wfile.write(b'{"ok": false, "error": "not allowed"}\n')
             return
         try:
             req = json.loads(self.rfile.readline(1 << 20) or b"{}")
-            fn = OPS.get(req.get("op"))
+            op = req.get("op")
+            fn = OPS.get(op)
             if fn is None:
                 raise ValueError("unknown operation")
-            res = fn(**(req.get("args") or {}))
+            args = {k: v for k, v in (req.get("args") or {}).items() if not str(k).startswith("_")}
+            if op in NEEDS_UID:
+                args["_uid"] = uid
+            res = fn(**args)
             self.wfile.write((json.dumps({"ok": True, "result": res}) + "\n").encode())
         except TypeError as e:
             self.wfile.write((json.dumps({"ok": False, "error": f"bad arguments: {e}"}) + "\n").encode())
