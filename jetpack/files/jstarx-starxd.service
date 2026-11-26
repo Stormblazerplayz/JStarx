@@ -1,0 +1,13 @@
+[Unit]
+Description=JStarx system helper (memory saver, power modes, fan)
+After=local-fs.target
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/jstarx/lib
+ExecStart=/usr/bin/python3 -m jstarx_core.starxd
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

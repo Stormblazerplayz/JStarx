@@ -285,13 +285,13 @@ def convert_hf():
         return status("spark", state="needs-conversion", message="The model is in safetensors format. Install 'Python AI Kit' from Star Store to convert it.")
     status("spark", state="converting", message="Converting the model to GGUF (this takes a while)…")
     f16 = os.path.join(MODELS, "spark-1-f16.gguf")
-    r = subprocess.run(["python3", conv, MODELS, "--outfile", f16, "--outtype", "f16"], capture_output=True, text=True)
+    r = subprocess.run(["python3", conv, MODELS, "--outfile", f16, "--outtype", "f16"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
     if r.returncode != 0:
         return status("spark", state="needs-conversion", message="Conversion failed: " + (r.stderr or r.stdout).strip()[-250:])
     q = shutil.which("llama-quantize")
     if q:
         out = os.path.join(MODELS, "spark-1-q8_0.gguf")
-        if subprocess.run([q, f16, out, "Q8_0"], capture_output=True).returncode == 0:
+        if subprocess.run([q, f16, out, "Q8_0"], stdout=subprocess.PIPE, stderr=subprocess.PIPE).returncode == 0:
             os.remove(f16)
     return after_install()
 

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# zram: compressed RAM used as fast swap (half of the RAM, at most 4 GB).
+# jstarx-zram.service runs "start" (turn it on) and "stop" (turn it off, only if we turned it on).
+# It does nothing on a kernel without zram, or when zram swap is already on.
+set -euo pipefail
+
+MARK=/run/jstarx-zram.on
+
+case "${1:-}" in
+  start) ;;
+  stop)
+    if [ -f "$MARK" ]; then
+      swapoff /dev/zram0 2>/dev/null || true
+      rm -f "$MARK"
+    fi
+    exit 0 ;;
+  *)
+    echo "usage: jstarx-zram start|stop" >&2
+    exit 2 ;;
+esac
+
+if grep -q '^/dev/zram' /proc/swaps; then
+  echo "zram swap is already on; leaving it alone"
+  exit 0
+fi
+if [ ! -e /sys/block/zram0 ] && ! modprobe zram num_devices=1 2>/dev/null; then
+  echo "this kernel has no zram; skipping"
+  exit 0
+fi
+if [ ! -e /sys/block/zram0 ]; then
+  echo "zram0 did not appear; skipping"
+  exit 0
+fi
+
+if [ -w /sys/block/zram0/reset ]; then
+  echo 1 > /sys/block/zram0/reset || true
+fi
+if [ -w /sys/block/zram0/comp_algorithm ]; then
+  echo lz4 > /sys/block/zram0/comp_algorithm || true
+fi
+mem_kb=$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)
+size=$(( mem_kb * 1024 / 2 ))
+if [ "$size" -gt $(( 4 << 30 )) ]; then size=$(( 4 << 30 )); fi
+if ! echo "$size" > /sys/block/zram0/disksize; then
+  echo "zram0 is busy; skipping"
+  exit 0
+fi
+mkswap /dev/zram0 > /dev/null
+swapon -p 100 /dev/zram0
+: > "$MARK"
+echo "zram swap on: $(( size >> 20 )) MB"

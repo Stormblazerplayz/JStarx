@@ -98,7 +98,7 @@ def _publish(**fields):
 def _run(cmd, step, timeout=6 * 3600):
     log("system update:", step)
     _publish(state="installing", message=step)
-    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=timeout)
+    r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, timeout=timeout)
     if r.returncode != 0:
         raise RuntimeError(f"{step} failed: {r.stdout.strip()[-300:]}")
     return r.stdout

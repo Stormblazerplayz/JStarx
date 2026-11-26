@@ -1,0 +1,12 @@
+[Unit]
+Description=JStarx zram (compressed RAM used as fast swap)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/jstarx/bin/jstarx-zram start
+ExecStop=/opt/jstarx/bin/jstarx-zram stop
+
+[Install]
+WantedBy=multi-user.target
