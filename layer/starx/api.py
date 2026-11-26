@@ -145,7 +145,7 @@ class Api:
         cmds = {
             "reboot": ["systemctl", "reboot"],
             "poweroff": ["systemctl", "poweroff"],
-            "logout": ["labwc", "--exit"],
+            "logout": wm.logout_command(),
         }
         if action not in cmds:
             raise ValueError("unknown action")

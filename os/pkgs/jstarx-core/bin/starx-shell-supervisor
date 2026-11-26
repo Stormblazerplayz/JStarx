@@ -6,7 +6,12 @@ LOG="$RUN/supervisor.log"
 FACTORY="$(readlink -f /etc/jstarx/factory-layer)"
 fails=0
 # The desktop session ended (the compositor is gone): nothing to keep running.
-compositor_alive() { [ -S "${XDG_RUNTIME_DIR:-/tmp}/${WAYLAND_DISPLAY:-wayland-0}" ]; }
+# The compositor's socket (Wayland, the SD card image), or else the X server's socket (JetPack)
+compositor_alive() {
+  [ -S "${XDG_RUNTIME_DIR:-/tmp}/${WAYLAND_DISPLAY:-wayland-0}" ] && return 0
+  d="${DISPLAY:-:0}"; d="${d#:}"; d="${d%%.*}"
+  [ -S "/tmp/.X11-unix/X${d:-0}" ]
+}
 while true; do
   compositor_alive || exit 0
   start=$(date +%s)

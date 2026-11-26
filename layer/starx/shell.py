@@ -15,8 +15,26 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gdk, GLib, Gtk, GtkLayerShell  # noqa: E402
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
+
+# gtk-layer-shell places the panels on Wayland (the JStarx SD card image). JetPack's X11 session
+# has no layer shell: the same panels are normal X11 windows with panel hints (see Surface).
+try:
+    gi.require_version("GtkLayerShell", "0.1")
+    from gi.repository import GtkLayerShell  # noqa: E402
+    if hasattr(GtkLayerShell, "is_supported"):
+        LAYER_SHELL = bool(GtkLayerShell.is_supported())
+    else:  # an old gtk-layer-shell: a Wayland session has it
+        LAYER_SHELL = bool(os.environ.get("WAYLAND_DISPLAY"))
+except (ValueError, ImportError):
+    GtkLayerShell = None
+    LAYER_SHELL = False
+
+try:
+    gi.require_version("GdkX11", "3.0")
+    from gi.repository import GdkX11  # noqa: E402
+except (ValueError, ImportError):
+    GdkX11 = None
 
 try:
     import cairo  # noqa: E402
@@ -29,7 +47,17 @@ from .api import Api  # noqa: E402
 from .bridge import Bridge, FileWatch  # noqa: E402
 from .notify import NotificationServer  # noqa: E402
 
-Edge, Layer, KB = GtkLayerShell.Edge, GtkLayerShell.Layer, GtkLayerShell.KeyboardMode
+if LAYER_SHELL:
+    Edge, Layer, KB = GtkLayerShell.Edge, GtkLayerShell.Layer, GtkLayerShell.KeyboardMode
+else:  # the same names as gtk-layer-shell, for the X11 fallback
+    class Edge:
+        TOP, BOTTOM, LEFT, RIGHT = "top", "bottom", "left", "right"
+
+    class Layer:
+        BACKGROUND, BOTTOM, TOP, OVERLAY = 0, 1, 2, 3
+
+    class KB:
+        NONE, EXCLUSIVE, ON_DEMAND = 0, 1, 2
 ISLAND_W, ISLAND_H = 620, 52
 ISLAND_PILL = ((ISLAND_W - 236) / 2, 8, 236, 38, 19)  # the compact island inside its surface (x, y, w, h, radius)
 
@@ -56,15 +84,18 @@ class Surface:
             win.set_visual(visual)
             win.set_app_paintable(True)  # nothing painted outside the page, so it stays see-through
             self.shape = shape
-        GtkLayerShell.init_for_window(win)
-        GtkLayerShell.set_namespace(win, f"starx-{name}")
-        GtkLayerShell.set_layer(win, layer)
-        for edge in anchors:
-            GtkLayerShell.set_anchor(win, edge, True)
-        for edge, px in (margins or {}).items():
-            GtkLayerShell.set_margin(win, edge, px)
-        GtkLayerShell.set_exclusive_zone(win, exclusive)
-        GtkLayerShell.set_keyboard_mode(win, keyboard)
+        if LAYER_SHELL:
+            GtkLayerShell.init_for_window(win)
+            GtkLayerShell.set_namespace(win, f"starx-{name}")
+            GtkLayerShell.set_layer(win, layer)
+            for edge in anchors:
+                GtkLayerShell.set_anchor(win, edge, True)
+            for edge, px in (margins or {}).items():
+                GtkLayerShell.set_margin(win, edge, px)
+            GtkLayerShell.set_exclusive_zone(win, exclusive)
+            GtkLayerShell.set_keyboard_mode(win, keyboard)
+        else:
+            self._x11_hints(win, name, anchors, size, shell.screen)
         # Shell surfaces are opaque: each one paints the wallpaper that sits behind it, so it looks
         # see-through but never needs alpha blending (more reliable, and cheaper for the compositor).
         if size:
@@ -74,13 +105,15 @@ class Surface:
         win.add(self.view)
         self.win = win
         self.size = size
+        self.anchors = anchors
+        self.exclusive_px = exclusive
+        self.keyboard = keyboard
+        self.geometry = None
         if self.shape:
             self.view.connect("draw", self._clip_view)
-            win.connect("realize", lambda *a: self._apply_shape_input())
+        win.connect("realize", lambda *a: self._on_realize())
         win.connect("map-event", lambda *a: self.repaint())
         win.connect("size-allocate", self._on_alloc)
-        self.anchors = anchors
-        self.geometry = None
         if visible:
             win.show_all()
 
@@ -92,7 +125,68 @@ class Surface:
         geo = {"x": x, "y": y, "w": w, "h": h}
         if geo != self.geometry:
             self.geometry = geo
+            if not LAYER_SHELL:  # X11: the window goes where the page is told it is
+                self.win.move(x, y)
+                self._update_struts()
             self.shell.bridge.emit("geometry", geo, [self.view])
+
+    # ---------------------------------------------------------------- X11 (JetPack): panels are normal windows
+    def _x11_hints(self, win, name, anchors, size, screen):
+        """Make a window act as a panel under an X11 window manager (openbox on JetPack)."""
+        win.set_decorated(False)
+        win.set_skip_taskbar_hint(True)
+        win.set_skip_pager_hint(True)
+        W, H = screen["width"], screen["height"]
+        full = all(edge in anchors for edge in (Edge.TOP, Edge.BOTTOM, Edge.LEFT, Edge.RIGHT))
+        if name == "desktop":
+            win.set_type_hint(Gdk.WindowTypeHint.DESKTOP)
+        elif name == "overlay":  # full screen, takes the keyboard, above every window
+            win.set_type_hint(Gdk.WindowTypeHint.NORMAL)
+            win.set_keep_above(True)
+            win.fullscreen()
+        else:  # dock and island: panels above the windows
+            win.set_type_hint(Gdk.WindowTypeHint.DOCK)
+            win.set_keep_above(True)
+        win.set_default_size(*((W, H) if full or not size else size))
+
+    def _on_realize(self):
+        if self.shape:
+            self._apply_shape_input()
+        if not LAYER_SHELL:
+            self._update_struts()
+
+    def _xid(self):
+        gdk_win = self.win.get_window()
+        if gdk_win is None or GdkX11 is None:
+            return None
+        return GdkX11.X11Window.get_xid(gdk_win)
+
+    def _update_struts(self):
+        """A panel that takes screen space (the dock) keeps maximized windows clear of it (EWMH struts)."""
+        if LAYER_SHELL or not self.geometry or not shutil.which("xprop"):
+            return
+        xid = self._xid()
+        if not xid:
+            return
+        g = self.geometry
+        x0, x1 = g["x"], g["x"] + g["w"] - 1
+        px = max(0, int(self.exclusive_px or 0))
+        partial = [0] * 12  # left, right, top, bottom, then the start/end ranges of each edge
+        plain = [0] * 4     # left, right, top, bottom
+        if px and Edge.BOTTOM in self.anchors:
+            partial[3], partial[10], partial[11] = px, x0, x1
+            plain[3] = px
+        if px and Edge.TOP in self.anchors:
+            partial[2], partial[8], partial[9] = px, x0, x1
+            plain[2] = px
+        for prop, values in (("_NET_WM_STRUT_PARTIAL", partial), ("_NET_WM_STRUT", plain)):
+            subprocess.run(["xprop", "-id", str(xid), "-f", prop, "32c", "-set", prop, ", ".join(str(v) for v in values)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+
+    def focus(self):
+        """X11 panels do not take the keyboard by themselves: give it to the overlay when it opens."""
+        if not LAYER_SHELL and self.keyboard != KB.NONE and self.win.get_visible():
+            self.win.present()
 
     def _clip_view(self, view, cr):
         """Runs before the page is painted: only the island's rounded shape gets painted."""
@@ -139,7 +233,11 @@ class Surface:
         self.win.input_shape_combine_region(region)
 
     def exclusive(self, px):
-        GtkLayerShell.set_exclusive_zone(self.win, int(px))
+        self.exclusive_px = int(px)
+        if LAYER_SHELL:
+            GtkLayerShell.set_exclusive_zone(self.win, self.exclusive_px)
+        else:
+            self._update_struts()
 
 
 class ShellApi(Api):
@@ -297,6 +395,7 @@ class Shell:
         if self.idle_proc and self.idle_proc.poll() is None:
             self.idle_proc.terminate()
         if not shutil.which("swayidle"):
+            self._x11_screen_off(off)  # JetPack (X11): the screen turns off, the desktop does not rest
             return
         ctl = shutil.which("starx-ctl") or "starx-ctl"
         args = ["swayidle", "-w"]
@@ -306,6 +405,20 @@ class Shell:
             args += ["timeout", str(off * 60), "wlopm --off '*'", "resume", "wlopm --on '*'"]
         if len(args) > 2:
             self.idle_proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def _x11_screen_off(self, minutes):
+        """JetPack (X11): turn the screen off after a number of minutes without input (never if 0)."""
+        if not shutil.which("xset"):
+            return
+        if minutes:
+            cmds = [["xset", "s", "off"], ["xset", "+dpms"], ["xset", "dpms", "0", "0", str(int(minutes) * 60)]]
+        else:
+            cmds = [["xset", "s", "off"], ["xset", "-dpms"]]
+        for cmd in cmds:
+            try:
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                return
 
     def _maybe_welcome(self):
         if not self.api.settings.get("welcome_done") and os.environ.get("STARX_NO_WELCOME") != "1":
@@ -336,6 +449,7 @@ class Shell:
             return
         self.overlay_panel = panel
         ov.win.show_all()
+        ov.focus()
         ov.repaint()
         self.bridge.emit("overlay-open", {"panel": panel, "data": data}, [ov.view])
         self.bridge.emit("overlay-state", {"panel": panel})

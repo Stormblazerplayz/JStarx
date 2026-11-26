@@ -58,7 +58,7 @@ The first start takes a bit longer because JStarx grows to fill your whole SD ca
 
 ## Already running JetPack 4.6.1? Add the JStarx core
 
-If your Jetson Nano already runs NVIDIA's JetPack 4.6.1, you can add the JStarx core services (memory saver, power modes, fan control, swap) without flashing anything. See [`jetpack/README.md`](jetpack/README.md). The JStarx desktop and apps come only with the JStarx image.
+If your Jetson Nano already runs NVIDIA's JetPack 4.6.1, you can add the JStarx core services and desktop without flashing anything. See [`jetpack/README.md`](jetpack/README.md). Spark, the Nix-based Star Store apps and wireless display casting need the JStarx SD card image.
 
 ## Spark 1 (the assistant)
 

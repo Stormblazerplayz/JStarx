@@ -7,12 +7,20 @@ This runs the JStarx core services on a Jetson Nano that has NVIDIA's JetPack 4.
 - **Swap:** a swap file on the card (up to 8 GB), and zram (compressed RAM, used first).
 - **Memory setting:** `vm.swappiness` is 100, the most this kernel allows.
 
-Not included yet: the JStarx desktop, Star Store, Spark and StarAI, and whole-system updates. Those need the JStarx SD card image.
+The desktop is included (see below). Not included yet: Spark, StarAI, the Star Store's Nix apps, wireless display casting and whole-system updates. Those need the JStarx SD card image.
+
+## The desktop
+
+The installer adds the JStarx desktop (StarShell) on the openbox window manager. After the install, log out and choose **JStarx** at the login screen.
+
+- The dock, the Dynamic Island, the launchpad and the apps look and work the same as on the SD card image.
+- Keys: Super+A launchpad, Super+Space Spark, Super+C control center, Super+P power, Super+E Settings, Super+B Firefox, Super+Return terminal (xterm), Super+Q close the window, Print takes a screenshot.
+- Power saving: the screen turns off after the time you set. The desktop does not dim first.
 
 ## Install
 
 1. Copy this repo to the Jetson (`git clone`, or download the ZIP from GitHub).
-2. In a terminal, go into the `jetpack` folder and run:
+2. In a terminal, go into the `jetpack` folder and run (it installs the desktop packages, so it needs internet):
 
    ```bash
    sudo ./install.sh

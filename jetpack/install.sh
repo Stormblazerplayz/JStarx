@@ -55,9 +55,34 @@ install -m 0644 "$HERE/files/jstarx-starxd.service" "$HERE/files/jstarx-swap.ser
 install -m 0644 "$HERE/files/90-jstarx.conf" "$ROOT/etc/sysctl.d/90-jstarx.conf"
 install -m 0644 "$HERE/files/jstarx.tmpfiles.conf" "$ROOT/etc/tmpfiles.d/jstarx.conf"
 
+# 2b. The desktop: StarShell on the openbox window manager (the "JStarx" session at the login screen)
+FACTORY="$ROOT/etc/jstarx/factory-layer"
+rm -rf "${FACTORY:?}"
+mkdir -p "$(dirname "$FACTORY")"
+cp -a "$REPO/layer" "$FACTORY"
+find "$FACTORY" -name __pycache__ -type d -prune -exec rm -rf {} +
+install -m 0755 "$HERE/files/starx-session-x11" "$OPT/bin/starx-session-x11"
+install -m 0755 "$REPO/os/pkgs/jstarx-core/bin/starx-shell-supervisor" "$OPT/bin/starx-shell-supervisor"
+install -d "$OPT/config/openbox" "$ROOT/usr/share/xsessions"
+install -m 0644 "$HERE/files/openbox/rc.xml" "$OPT/config/openbox/rc.xml"
+install -m 0644 "$HERE/files/jstarx.desktop" "$ROOT/usr/share/xsessions/jstarx.desktop"
+install -d "$ROOT/usr/share/themes/JStarx/gtk-3.0"
+install -m 0644 "$REPO/os/config/gtk.css" "$ROOT/usr/share/themes/JStarx/gtk-3.0/gtk.css"
+
 # 3. Start everything (only on a real Jetson)
 if [ -z "$ROOT" ]; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update || warn "could not update the package list (are you online?)"
+  apt-get install -y openbox xcompmgr wmctrl xdotool x11-utils x11-xserver-utils scrot xterm \
+    python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.0 pulseaudio-utils \
+    || warn "some desktop packages could not be installed (are you online?): run this script again"
+  apt-get install -y firefox || warn "Firefox could not be installed; the Firefox icon will not start"
   getent group jstarx >/dev/null || groupadd --system jstarx
+  # the desktop talks to the helper through its socket: the user who runs this must be in the group
+  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+    usermod -aG jstarx "$SUDO_USER" || warn "could not add $SUDO_USER to the jstarx group"
+    echo "Added $SUDO_USER to the jstarx group: log out and back in once."
+  fi
   systemd-tmpfiles --create /etc/tmpfiles.d/jstarx.conf
   sysctl -q -p /etc/sysctl.d/90-jstarx.conf || warn "the memory settings take effect at the next start"
   systemctl daemon-reload
@@ -65,6 +90,7 @@ if [ -z "$ROOT" ]; then
   systemctl enable --now jstarx-swap.service || warn "no swap file: see journalctl -u jstarx-swap"
   systemctl enable --now jstarx-zram.service || warn "no zram: see journalctl -u jstarx-zram"
   echo "JStarx core $VERSION is installed. Check it with: systemctl status jstarx-starxd"
+  echo "For the desktop, log out and choose the JStarx session at the login screen."
 else
   echo "Test install of JStarx core $VERSION finished in $ROOT. No services were started."
 fi

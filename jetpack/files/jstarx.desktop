@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=JStarx
+Comment=The JStarx desktop (StarShell on openbox)
+Exec=/opt/jstarx/bin/starx-session-x11
+Type=Application
+DesktopNames=JStarx

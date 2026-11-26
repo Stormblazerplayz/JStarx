@@ -9,7 +9,10 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-gi.require_version("WebKit2", "4.1")
+try:
+    gi.require_version("WebKit2", "4.1")
+except ValueError:  # Ubuntu 18.04 (JetPack 4.6.1) only has WebKit2GTK 4.0
+    gi.require_version("WebKit2", "4.0")
 from gi.repository import Gdk, Gio, GLib, WebKit2  # noqa: E402
 
 from . import paths  # noqa: E402
