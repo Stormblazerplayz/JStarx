@@ -1,0 +1,30 @@
+/* JStarx GTK 3 theme: dark Adwaita with purple surfaces and orange accents (also styles Firefox). */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained-dark.css");
+
+@define-color theme_bg_color #1B063D;
+@define-color theme_fg_color #F6F0FF;
+@define-color theme_base_color #140430;
+@define-color theme_text_color #F6F0FF;
+@define-color theme_selected_bg_color #FF8A00;
+@define-color theme_selected_fg_color #1A0A00;
+@define-color insensitive_bg_color #22094A;
+@define-color borders #3A1A6B;
+@define-color unfocused_borders #2A1350;
+@define-color accent_color #FF9F43;
+@define-color accent_bg_color #FF8A00;
+@define-color accent_fg_color #1A0A00;
+@define-color headerbar_bg_color #2B0B57;
+@define-color headerbar_fg_color #F6F0FF;
+
+window, .background { background-color: @theme_bg_color; color: @theme_fg_color; }
+headerbar, .titlebar {
+  background-image: linear-gradient(180deg, #2B0B57, #1B063D);
+  border-color: #3A1A6B; color: #F6F0FF; box-shadow: inset 0 1px rgba(255,255,255,0.10);
+}
+headerbar:backdrop, .titlebar:backdrop { background-image: none; background-color: #1B063D; }
+button.suggested-action, button:checked { background-image: linear-gradient(135deg, #9D4EDD, #FF8A00); color: #1A0A00; border-color: transparent; }
+entry:focus, spinbutton:focus { box-shadow: inset 0 0 0 2px #FF9F43; }
+scale highlight, progressbar progress, switch:checked { background-image: linear-gradient(90deg, #9D4EDD, #FF8A00); background-color: #FF8A00; }
+selection, *:selected { background-color: #FF8A00; color: #1A0A00; }
+menu, .menu, popover.background { background-color: #1B063D; border-color: #3A1A6B; }
+tooltip { background-color: rgba(27, 6, 61, 0.95); color: #F6F0FF; }

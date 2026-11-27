@@ -1,0 +1,108 @@
+# JStarx boot screen (Plymouth script theme).
+# The logo drops in and bounces, then floats; a glass bar shows boot progress;
+# messages (for example from auto-repair) appear under the bar.
+
+W = Window.GetWidth();
+H = Window.GetHeight();
+Window.SetBackgroundTopColor(0.07, 0.01, 0.18);
+Window.SetBackgroundBottomColor(0.20, 0.04, 0.33);
+
+bg = Sprite(Image("background.png").Scale(W, H));
+bg.SetZ(-100);
+
+size = Math.Int(H * 0.24);
+if (size > 260) size = 260;
+if (size < 96) size = 96;
+logo_image = Image("logo.png").Scale(size, size);
+logo = Sprite(logo_image);
+logo.SetZ(10);
+
+glow_image = Image("glow.png");
+glow = Sprite(glow_image);
+glow.SetZ(5);
+
+title_image = Image.Text("JStarx", 1, 1, 1, 1, "Sans Bold 30");
+title = Sprite(title_image);
+title.SetZ(10);
+title.SetOpacity(0);
+
+track_image = Image("track.png");
+track = Sprite(track_image);
+track.SetX(W / 2 - track_image.GetWidth() / 2);
+track.SetY(H * 0.72);
+track.SetZ(10);
+fill_image = Image("fill.png");
+fill = Sprite(fill_image.Scale(4, fill_image.GetHeight()));
+fill.SetX(W / 2 - track_image.GetWidth() / 2);
+fill.SetY(H * 0.72);
+fill.SetZ(11);
+
+dot_image = Image("dot.png");
+i = 0;
+while (i < 3) {
+  dots[i] = Sprite(dot_image);
+  dots[i].SetZ(10);
+  i = i + 1;
+}
+
+message = Sprite();
+message.SetZ(12);
+
+global.t = 0;
+
+fun bounce(x) {
+  n1 = 7.5625;
+  d1 = 2.75;
+  if (x < 1 / d1) return n1 * x * x;
+  if (x < 2 / d1) { x = x - 1.5 / d1; return n1 * x * x + 0.75; }
+  if (x < 2.5 / d1) { x = x - 2.25 / d1; return n1 * x * x + 0.9375; }
+  x = x - 2.625 / d1;
+  return n1 * x * x + 0.984375;
+}
+
+fun refresh() {
+  global.t = global.t + 0.02;
+  cx = W / 2;
+  cy = H * 0.42;
+  if (global.t < 1.4) {
+    y = cy - H * 0.55 * (1 - bounce(global.t / 1.4));
+  } else {
+    y = cy + Math.Sin((global.t - 1.4) * 2.2) * 7;
+  }
+  logo.SetX(cx - size / 2);
+  logo.SetY(y - size / 2);
+  glow.SetX(cx - glow_image.GetWidth() / 2);
+  glow.SetY(y - glow_image.GetHeight() / 2);
+  glow.SetOpacity(0.55 + 0.35 * Math.Sin(global.t * 1.8));
+  a = (global.t - 1.0) / 0.6;
+  if (a < 0) a = 0;
+  if (a > 1) a = 1;
+  title.SetOpacity(a);
+  title.SetX(cx - title_image.GetWidth() / 2);
+  title.SetY(cy + size / 2 + 18);
+  i = 0;
+  while (i < 3) {
+    p = Math.Sin(global.t * 4.5 - i * 0.9);
+    if (p < 0) p = 0;
+    dots[i].SetX(cx - 30 + i * 24);
+    dots[i].SetY(H * 0.72 + 26 - p * 8);
+    dots[i].SetOpacity(0.25 + 0.75 * p);
+    i = i + 1;
+  }
+}
+Plymouth.SetRefreshFunction(refresh);
+
+fun progress_cb(duration, progress) {
+  w = Math.Int(track_image.GetWidth() * progress);
+  if (w < 4) w = 4;
+  fill.SetImage(fill_image.Scale(w, fill_image.GetHeight()));
+}
+Plymouth.SetBootProgressFunction(progress_cb);
+
+fun message_cb(text) {
+  img = Image.Text(text, 1, 0.82, 0.55, 1, "Sans 14");
+  message.SetImage(img);
+  message.SetX(W / 2 - img.GetWidth() / 2);
+  message.SetY(H * 0.72 + 52);
+}
+Plymouth.SetMessageFunction(message_cb);
