@@ -1,9 +1,12 @@
 # Builds the JStarx SD card image for the Jetson's built-in NVIDIA 4.9 kernel (NixOS 22.05, see default-22.nix).
-# Only runs when started by hand (Actions tab -> "Build JStarx OS image (22.05)" -> Run workflow).
+# Runs on pushes to the 22.05 branch that change its files, and when started by hand.
 name: Build JStarx OS image (22.05)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [claude/keen-edison-q2yclm]
+    paths: ["default-22.nix", "os-22/**", ".github/workflows/build-image-2205.yml"]
 
 permissions:
   contents: read
