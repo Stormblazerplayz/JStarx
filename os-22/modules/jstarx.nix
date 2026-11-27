@@ -157,7 +157,7 @@ in
 
   environment.systemPackages = with pkgs; [ firefox
     core runtime J.jstarx-theme
-    xorg.xset xorg.xcompmgr openbox xterm labwc swayidle wlrctl wlr-randr grim foot wf-recorder ffmpeg
+    xorg.xset xorg.xcompmgr xorg.xprop xorg.xrandr wmctrl xdotool pulseaudio openbox xterm labwc swayidle wlrctl wlr-randr grim foot wf-recorder ffmpeg
     gnome-network-displays networkmanager wireplumber libnotify xdg-utils
     git curl htop
   ];

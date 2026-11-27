@@ -3,6 +3,7 @@
 The JStarx SD card image runs labwc (Wayland) and uses wlrctl. JetPack runs an X11 session with
 openbox and uses wmctrl (and xdotool to minimize).
 """
+import os
 import shutil
 import subprocess
 
@@ -32,7 +33,8 @@ def _ok(args, timeout=2):
 
 
 def _on_wayland():
-    return shutil.which("wlrctl") is not None
+    # a real Wayland display (labwc sets WAYLAND_DISPLAY); having wlrctl installed is not enough
+    return bool(os.environ.get("WAYLAND_DISPLAY")) and shutil.which("wlrctl") is not None
 
 
 def _is_panel(title):
