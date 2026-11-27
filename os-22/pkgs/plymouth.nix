@@ -5,5 +5,5 @@ runCommand "jstarx-plymouth" { } ''
   mkdir -p $d
   cp ${../plymouth/jstarx}/* $d/
   chmod -R u+w $d
-  substituteInPlace $d/jstarx.plymouth --replace-fail "@out@" "$out"
+  substituteInPlace $d/jstarx.plymouth --replace "@out@" "$out"
 ''
