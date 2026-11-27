@@ -6,6 +6,19 @@ let
   core = J.jstarx-core;
   layer = J.jstarx-layer;
   runtime = J.jstarx-runtime;
+  # The board's display has no Wayland (DRM) device, so the desktop runs on X11 with the framebuffer,
+  # the same way as the JetPack desktop (jetpack/files/starx-session-x11).
+  x11Session = pkgs.writeShellScript "jstarx-x11-session" ''
+    export XDG_CURRENT_DESKTOP=JStarx XDG_SESSION_DESKTOP=JStarx XDG_SESSION_TYPE=x11
+    export GDK_BACKEND=x11 MOZ_ENABLE_WAYLAND=0 MOZ_LEGACY_PROFILES=1 STARX_GPU=never LIBGL_ALWAYS_SOFTWARE=1
+    export GTK_THEME=JStarx
+    export JSTARX_LAYER=${layer} STARX_APP_BIN=${layer}/bin/starx-app STARX_PYTHON=${runtime}/bin/starx-python
+    export PATH=${layer}/bin:${core}/bin:${runtime}/bin:$PATH
+    xset s off || true
+    xset -dpms || true
+    xcompmgr >/dev/null 2>&1 &
+    exec ${pkgs.openbox}/bin/openbox --config-file ${../config/openbox/rc.xml} --startup "${core}/bin/starx-shell-supervisor"
+  '';
   version = (lib.importJSON ../../layer/layer.json).version;
   codename = (lib.importJSON ../../layer/layer.json).codename;
   greetdToml = pkgs.writeShellScript "jstarx-greetd-config" ''
@@ -82,8 +95,21 @@ in
   security.polkit.enable = true;
 
   # ------------------------------------------------------------------ desktop session
-  services.greetd = {
+  # X11 desktop with log-in as storm (the Wayland greeter cannot run on this board)
+  services.xserver = {
     enable = true;
+    videoDrivers = [ "fbdev" ];
+    windowManager.openbox.enable = true;
+    displayManager.lightdm = {
+      enable = true;
+      greeter.enable = false;
+      autoLogin = { enable = true; user = "storm"; };
+    };
+    displayManager.session = [ { manage = "desktop"; name = "jstarx"; start = "exec ${x11Session}"; } ];
+    displayManager.defaultSession = "jstarx";
+  };
+  services.greetd = {
+    enable = false;
     settings.default_session = { command = "${core}/bin/starx-session"; user = "storm"; };
   };
   systemd.services.greetd = {
@@ -131,7 +157,7 @@ in
 
   environment.systemPackages = with pkgs; [ firefox
     core runtime J.jstarx-theme
-    labwc swayidle wlrctl wlr-randr grim foot wf-recorder ffmpeg
+    xorg.xset xorg.xcompmgr openbox xterm labwc swayidle wlrctl wlr-randr grim foot wf-recorder ffmpeg
     gnome-network-displays networkmanager wireplumber libnotify xdg-utils
     git curl htop
   ];
