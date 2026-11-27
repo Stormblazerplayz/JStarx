@@ -60,7 +60,7 @@ in
     enable = true;
     theme = "jstarx";
     themePackages = [ J.jstarx-plymouth ];
-    font = "${pkgs.inter}/share/fonts/truetype/InterVariable.ttf";
+    font = "${pkgs.inter}/share/fonts/opentype/Inter-Regular.otf";
   };
   # Plymouth only uses a graphics card that udev has finished setting up. Without this wait it
   # can look too early, miss the card and show text instead of the boot screen.
