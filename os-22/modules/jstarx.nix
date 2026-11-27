@@ -12,10 +12,13 @@ let
     export XDG_CURRENT_DESKTOP=JStarx XDG_SESSION_DESKTOP=JStarx XDG_SESSION_TYPE=x11
     export GDK_BACKEND=x11 MOZ_ENABLE_WAYLAND=0 MOZ_LEGACY_PROFILES=1 STARX_GPU=never LIBGL_ALWAYS_SOFTWARE=1
     export GTK_THEME=JStarx
+    export STARX_NO_WELCOME=1
     export JSTARX_LAYER=${layer} STARX_APP_BIN=${layer}/bin/starx-app STARX_PYTHON=${runtime}/bin/starx-python
     export PATH=${layer}/bin:${core}/bin:${runtime}/bin:$PATH
     xset s off || true
     xset -dpms || true
+    xset b off || true
+    xset b 0 0 0 || true
     xcompmgr >/dev/null 2>&1 &
     exec ${pkgs.openbox}/bin/openbox --config-file ${../config/openbox/rc.xml} --startup "${core}/bin/starx-shell-supervisor"
   '';
