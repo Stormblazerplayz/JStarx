@@ -188,9 +188,26 @@ in
   networking.networkmanager.enable = true;
   services.avahi = { enable = true; nssmdns = true; publish = { enable = true; addresses = true; workstation = true; }; };
   networking.firewall = {
-    enable = true;
+    # off on the 4.9 board kernel: its netfilter modules do not match this firewall (see the boot log)
+    enable = false;
     allowedTCPPorts = [ 7236 7250 8765 8091 ];   # Miracast, StarCast stream, AI model server
     allowedUDPPorts = [ 5353 7236 ];
+  };
+  # Grow the system partition to fill the card. The NixOS grow service picks the partition number from
+  # the device's minor number, which is wrong for mmcblk1 (partition 1 is minor 129), so this one uses sysfs.
+  systemd.services.jstarx-grow-root = {
+    description = "Grow the JStarx system partition to fill the SD card";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    path = with pkgs; [ util-linux e2fsprogs gawk ];
+    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; };
+    script = ''
+      dev=$(findmnt -n -o SOURCE /)
+      disk=/dev/$(lsblk -npo PKNAME "$dev" | head -n 1 | xargs basename)
+      part=$(cat /sys/class/block/$(basename "$dev")/partition)
+      echo ",+" | sfdisk -N "$part" --no-reread "$disk" || true
+      resize2fs "$dev" || true
+    '';
   };
   services.pipewire = { enable = true; alsa.enable = true; pulse.enable = true; wireplumber.enable = true; };
   security.rtkit.enable = true;
@@ -198,7 +215,8 @@ in
   # ------------------------------------------------------------------ power + 24/7 reliability
   # Memory: 4 GB RAM + a swap file of up to 8 GB on the SD card / SSD (12 GB usable). Idle app memory
   # is moved out of RAM early: first into compressed RAM (zram, fastest), then into the swap file.
-  zramSwap = { enable = true; memoryPercent = 50; algorithm = "zstd"; priority = 100; };
+  # zram is off on the board kernel (the zram module reload fails there); the swap file still works
+  zramSwap.enable = false;
   systemd.services.jstarx-swap = {
     description = "JStarx swap file (up to 8 GB, sized to fit the SD card)";
     wantedBy = [ "multi-user.target" ];

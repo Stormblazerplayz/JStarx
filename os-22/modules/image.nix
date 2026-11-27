@@ -15,6 +15,7 @@ in
   # The SD image module turns on drivers for every computer. The StarX Kernel only has what the
   # Jetson Nano (and the QEMU test machine) need, so keep that off.
 
+  sdImage.expandOnBoot = false;   # jstarx-grow-root in jstarx.nix does this instead
   sdImage.imageBaseName = lib.mkDefault "jstarx-${version}-jetson-nano";
 
   sdImage = {
