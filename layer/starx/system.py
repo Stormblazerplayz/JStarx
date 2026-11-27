@@ -23,7 +23,7 @@ def _run(args, timeout=8):
     if not shutil.which(args[0]):
         return None
     try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=timeout)
         return r
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -75,7 +75,8 @@ def meminfo():
 
 
 APP_NAMES = {"firefox": "Firefox", "WebKitWebProcess": "JStarx pages", "WebKitNetworkProcess": "JStarx pages",
-             "llama-server": "Spark 1", "labwc": "Window manager", "foot": "Terminal", "Xwayland": "X11 apps",
+             "llama-server": "Spark 1", "labwc": "Window manager", "openbox": "Window manager", "foot": "Terminal",
+             "xterm": "Terminal", "Xwayland": "X11 apps",
              "pipewire": "Sound", "wireplumber": "Sound", "gimp": "GIMP", "vlc": "VLC", "codium": "VSCodium",
              "thunar": "Files", "starxd": "JStarx system", "starai": "AI Center"}
 
@@ -296,26 +297,82 @@ def wifi_radio(on):
     return bool(r and r.returncode == 0)
 
 
-# ---------------- sound (PipeWire / WirePlumber) ----------------
-def audio_get():
-    r = _run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"])
+# ---------------- sound (PipeWire + WirePlumber on the SD card image, PulseAudio on JetPack) ----------------
+def _pactl_volume():
+    r = _run(["pactl", "get-sink-volume", "@DEFAULT_SINK@"])
     if not r or r.returncode != 0:
-        return {"available": False, "volume": 0, "muted": False}
-    m = re.search(r"Volume:\s*([0-9.]+)", r.stdout)
-    return {"available": True, "volume": round(float(m.group(1)) * 100) if m else 0, "muted": "MUTED" in r.stdout}
+        return None
+    m = re.search(r"(\d+)%", r.stdout)
+    return int(m.group(1)) if m else None
+
+
+def audio_get():
+    if shutil.which("wpctl"):
+        r = _run(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"])
+        if r and r.returncode == 0:
+            m = re.search(r"Volume:\s*([0-9.]+)", r.stdout)
+            return {"available": True, "volume": round(float(m.group(1)) * 100) if m else 0, "muted": "MUTED" in r.stdout}
+    volume = _pactl_volume() if shutil.which("pactl") else None
+    if volume is not None:
+        r = _run(["pactl", "get-sink-mute", "@DEFAULT_SINK@"])
+        return {"available": True, "volume": volume, "muted": bool(r and "yes" in r.stdout.lower())}
+    return {"available": False, "volume": 0, "muted": False}
 
 
 def audio_set(volume=None, muted=None):
-    if volume is not None:
-        v = max(0, min(100, int(volume))) / 100.0
-        _run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{v:.2f}"])
-    if muted is not None:
-        _run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if muted else "0"])
+    if shutil.which("wpctl"):
+        if volume is not None:
+            v = max(0, min(100, int(volume))) / 100.0
+            _run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", f"{v:.2f}"])
+        if muted is not None:
+            _run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if muted else "0"])
+    elif shutil.which("pactl"):
+        if volume is not None:
+            _run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{max(0, min(100, int(volume)))}%"])
+        if muted is not None:
+            _run(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "1" if muted else "0"])
     return audio_get()
 
 
 # ---------------- display ----------------
+def _xrandr_outputs():
+    """Connected screens and their modes, from xrandr (JetPack's X11 session)."""
+    r = _run(["xrandr", "--query"])
+    if not r or r.returncode != 0:
+        return []
+    res, cur = [], None
+    for line in r.stdout.splitlines():
+        if line and not line[0].isspace():  # a screen: "HDMI-0 connected primary 1920x1080+0+0 ..."
+            parts = line.split()
+            cur = None
+            if len(parts) >= 2 and parts[1] == "connected":
+                cur = {"name": parts[0], "description": "", "enabled": True, "scale": 1.0, "mode": None, "modes": set()}
+                res.append(cur)
+        elif cur is not None:  # a mode: "   1920x1080     60.00*+  50.00"
+            m = re.match(r"\s+(\d+)x(\d+)\s+(.*)$", line)
+            if not m:
+                continue
+            size = f"{m.group(1)}x{m.group(2)}"
+            cur["modes"].add(size)
+            for token in m.group(3).split():
+                rate = re.match(r"(\d+(?:\.\d+)?)", token)
+                if "*" in token and rate:
+                    cur["mode"] = f"{size}@{round(float(rate.group(1)))}"
+    for o in res:
+        o["modes"] = sorted(o["modes"], key=lambda s: -int(s.split("x")[0]) * int(s.split("x")[1]))
+    return res
+
+
+def _xrandr_set(name, mode=None):
+    if not mode:
+        return False
+    r = _run(["xrandr", "--output", name, "--mode", str(mode).split("@")[0]])
+    return bool(r and r.returncode == 0)
+
+
 def outputs():
+    if not shutil.which("wlr-randr"):
+        return _xrandr_outputs()
     r = _run(["wlr-randr", "--json"])
     if r and r.returncode == 0:
         import json
@@ -336,6 +393,8 @@ def outputs():
 
 
 def set_output(name, mode=None, scale=None):
+    if not shutil.which("wlr-randr"):
+        return _xrandr_set(name, mode)
     args = ["wlr-randr", "--output", name]
     if mode:
         args += ["--mode", mode]

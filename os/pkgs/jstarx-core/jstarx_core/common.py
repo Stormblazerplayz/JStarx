@@ -13,6 +13,8 @@ CURRENT = os.path.join(LAYERS, "current")
 FACTORY = os.environ.get("JSTARX_FACTORY_LAYER", "/etc/jstarx/factory-layer")
 REPO = os.environ.get("JSTARX_REPO", "Stormblazerplayz/JStarx")
 BOOT_DIR = os.environ.get("JSTARX_BOOT", "/boot/jstarx")
+NIX_DIR = os.environ.get("JSTARX_NIX_DIR", "/nix/var/nix")
+NV_RELEASE = os.environ.get("JSTARX_NV_RELEASE", "/etc/nv_tegra_release")
 
 
 def read_json(path, default=None):
@@ -60,7 +62,7 @@ def sha256_file(path):
 
 def run(args, timeout=120, check=False):
     try:
-        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         if check:
             raise RuntimeError(f"{args[0]} failed: {e}")
@@ -72,6 +74,19 @@ def run(args, timeout=120, check=False):
 
 def log(*parts):
     print("[jstarx]", *parts, flush=True)
+
+
+def platform():
+    """Where JStarx runs: "nixos" (the JStarx SD card image), "jetpack" (NVIDIA JetPack on Ubuntu,
+    the original Jetson Nano) or "other" (any other computer). JSTARX_PLATFORM overrides the check."""
+    forced = os.environ.get("JSTARX_PLATFORM")
+    if forced:
+        return forced
+    if os.path.isdir(NIX_DIR):
+        return "nixos"
+    if os.path.exists(NV_RELEASE):
+        return "jetpack"
+    return "other"
 
 
 def version_tuple(v):

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# JStarx swap file on the microSD card: a quarter of the card, at most 8 GB, always 2 GB left free.
+# jstarx-swap.service runs "start" (make the file if needed, turn it on) and "stop" (turn it off).
+set -euo pipefail
+
+FILE=/var/lib/jstarx-swapfile
+MB=$(( 1 << 20 ))
+
+case "${1:-}" in
+  start) ;;
+  stop)
+    swapoff "$FILE" 2>/dev/null || true
+    exit 0 ;;
+  *)
+    echo "usage: jstarx-swapfile start|stop" >&2
+    exit 2 ;;
+esac
+
+disk=$(df --output=size -B1M / | tail -n 1)
+want=$(( disk / 4 ))
+if [ "$want" -gt 8192 ]; then want=8192; fi
+if [ "$want" -lt 512 ]; then
+  echo "the card is too small for a swap file"
+  exit 0
+fi
+
+have=0
+if [ -f "$FILE" ]; then have=$(( $(stat -c %s "$FILE") / MB )); fi
+if [ "$have" -ne "$want" ]; then
+  swapoff "$FILE" 2>/dev/null || true
+  free=$(( $(df --output=avail -B1M / | tail -n 1) + have ))
+  if [ "$free" -le $(( want + 2048 )) ]; then want=$(( free - 2048 )); fi
+  if [ "$want" -lt 512 ]; then
+    echo "not enough free space for a swap file"
+    exit 0
+  fi
+  truncate -s 0 "$FILE"
+  fallocate -l "${want}M" "$FILE"
+  chmod 600 "$FILE"
+  mkswap "$FILE" > /dev/null
+fi
+if ! grep -q "^$FILE " /proc/swaps; then
+  swapon -p 10 "$FILE"
+fi
+echo "swap file ready: $want MB"

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- JStarx window manager settings for JetPack (openbox). The keys and apps match the SD card image (labwc). -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <resistance>
+    <strength>10</strength>
+    <screen_edge_strength>20</screen_edge_strength>
+  </resistance>
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+    <raiseOnFocus>yes</raiseOnFocus>
+  </focus>
+  <placement>
+    <policy>Smart</policy>
+  </placement>
+  <desktops>
+    <number>1</number>
+    <firstdesk>1</firstdesk>
+    <names>
+      <name>JStarx</name>
+    </names>
+  </desktops>
+  <applications>
+    <!-- Apps open full screen, from the top edge to the dock; the Dynamic Island floats over them -->
+    <application type="normal" class="*">
+      <maximized>yes</maximized>
+    </application>
+  </applications>
+  <keyboard>
+    <keybind key="W-space">
+      <action name="Execute"><command>starx-ctl spark</command></action>
+    </keybind>
+    <keybind key="W-a">
+      <action name="Execute"><command>starx-ctl launchpad</command></action>
+    </keybind>
+    <keybind key="W-c">
+      <action name="Execute"><command>starx-ctl control</command></action>
+    </keybind>
+    <keybind key="W-p">
+      <action name="Execute"><command>starx-ctl power</command></action>
+    </keybind>
+    <keybind key="W-e">
+      <action name="Execute"><command>starx-ctl launch settings</command></action>
+    </keybind>
+    <keybind key="W-b">
+      <action name="Execute"><command>firefox</command></action>
+    </keybind>
+    <keybind key="W-Return">
+      <action name="Execute"><command>xterm</command></action>
+    </keybind>
+    <keybind key="W-q">
+      <action name="Close"/>
+    </keybind>
+    <keybind key="W-Up">
+      <action name="ToggleMaximize"/>
+    </keybind>
+    <keybind key="W-Down">
+      <action name="Iconify"/>
+    </keybind>
+    <keybind key="XF86AudioRaiseVolume">
+      <action name="Execute"><command>sh -c 'pactl set-sink-volume @DEFAULT_SINK@ +5%; starx-ctl osd volume'</command></action>
+    </keybind>
+    <keybind key="XF86AudioLowerVolume">
+      <action name="Execute"><command>sh -c 'pactl set-sink-volume @DEFAULT_SINK@ -5%; starx-ctl osd volume'</command></action>
+    </keybind>
+    <keybind key="XF86AudioMute">
+      <action name="Execute"><command>sh -c 'pactl set-sink-mute @DEFAULT_SINK@ toggle; starx-ctl osd volume'</command></action>
+    </keybind>
+    <keybind key="Print">
+      <action name="Execute"><command>sh -c 'mkdir -p ~/Pictures; f=~/Pictures/Screenshot-$(date +%Y%m%d-%H%M%S).png; scrot "$f" &amp;&amp; starx-ctl notify "{\"summary\": \"Screenshot saved\", \"body\": \"In your Pictures folder\", \"icon\": \"display\"}"'</command></action>
+    </keybind>
+  </keyboard>
+  <mouse>
+    <dragThreshold>8</dragThreshold>
+    <doubleClickTime>200</doubleClickTime>
+  </mouse>
+</openbox_config>

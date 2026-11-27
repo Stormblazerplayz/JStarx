@@ -15,7 +15,7 @@ import threading
 import time
 
 from . import boot, layers, power, repair, spark, sysupdate, updater
-from .common import STATE, log, read_json, run, status, write_json
+from .common import STATE, log, platform, read_json, run, status, write_json
 
 SOCKET = os.environ.get("STARXD_SOCKET", "/run/starxd.sock")
 UNIX_CHKPWD = os.environ.get("JSTARX_UNIX_CHKPWD", "unix_chkpwd")
@@ -51,7 +51,8 @@ def op_system_set(key, value):
         return {"autologin": bool(value), "note": "Takes effect at the next start"}
     if key == "ssh":
         flag("ssh", bool(value))
-        run(["systemctl", "start" if value else "stop", "sshd.service"], timeout=30)
+        unit = "sshd.service" if platform() == "nixos" else "ssh.service"  # Ubuntu calls it ssh
+        run(["systemctl", "start" if value else "stop", unit], timeout=30)
         return {"ssh": bool(value)}
     if key == "hostname":
         name = "".join(c for c in str(value) if c.isalnum() or c == "-")[:40]
@@ -97,6 +98,9 @@ KEEP_FREE = 0.50       # ... move idle memory to swap until half of it is free
 SWEEP_SHARE = 50       # every 30 s, move 1/50 (2%) of each group's memory that nobody is using
 PRESSURE_LIMIT = 0.2   # a group that waited for memory more than 0.2% of the last 10 s is left alone
 MIN_SWAP_FREE = 128 << 20
+DROP_CACHES = os.environ.get("JSTARX_DROP_CACHES", "/proc/sys/vm/drop_caches")
+DROP_EVERY = 60    # without memory.reclaim, the automatic saver drops the page cache at most once a minute
+_last_drop = [0.0]
 
 
 def _meminfo():
@@ -146,11 +150,38 @@ def reclaim(nbytes, cg=None, minimum=16 << 20):
         return False
 
 
+def can_reclaim():
+    """True if the kernel can move a group's idle memory to swap (memory.reclaim, Linux 5.19 and newer).
+    JetPack's 4.9 kernel can't, so JStarx falls back to dropping the page cache there."""
+    return any(os.path.exists(os.path.join(cg, "memory.reclaim")) for cg in (CGROUP_USER, CGROUP_SYSTEM))
+
+
+def drop_caches(min_gap=0):
+    """Fallback for kernels without memory.reclaim: give back the files the system keeps in RAM for speed
+    (the page cache). Programs and their data stay where they are. Returns True if it ran."""
+    now = time.time()
+    if now - _last_drop[0] < min_gap:
+        return False
+    _last_drop[0] = now
+    try:
+        os.sync()  # write out changed files first, so that their memory can be given back too
+        with open(DROP_CACHES, "w") as f:
+            f.write("1")
+        return True
+    except OSError:
+        return False
+
+
 def free_ram(target, gentle=False):
     """Move idle memory to swap until `target` bytes of RAM are free: apps first, then background
     services. gentle (the automatic memory saver): a group whose programs are waiting for memory is
     skipped, and background services (Spark, StarAI jobs) give at most 256 MB per pass, so AI jobs
     that are using their memory keep running fast."""
+    if not can_reclaim():
+        # no memory.reclaim in this kernel (JetPack's 4.9): dropping the page cache is the most we can do
+        if _meminfo().get("MemAvailable", 0) < target:
+            drop_caches(min_gap=DROP_EVERY if gentle else 0)
+        return
     for cg in (CGROUP_USER, CGROUP_SYSTEM):
         need = target - _meminfo().get("MemAvailable", 0)
         if need <= 0:
@@ -229,7 +260,8 @@ def memory_saver_loop():
 
 def op_storage_clean():
     before = os.statvfs("/")
-    run(["nix-collect-garbage", "--delete-older-than", "14d"], timeout=3600)
+    if platform() == "nixos":
+        run(["nix-collect-garbage", "--delete-older-than", "14d"], timeout=3600)
     for d in ("/var/cache/jstarx",):
         run(["rm", "-rf", d], timeout=60)
     after = os.statvfs("/")
@@ -244,8 +276,16 @@ def op_shell_failed():
 _sys_lock = threading.Lock()
 
 
+def op_system_update_check():
+    if platform() != "nixos":
+        return {"state": "unsupported", "message": "Whole-system updates only work on the JStarx SD card image"}
+    return sysupdate.check()
+
+
 def op_system_update_apply():
     """Download and install the whole-system update in the background (it can take a while)."""
+    if platform() != "nixos":
+        raise RuntimeError("Whole-system updates only work on the JStarx SD card image")
     if not _sys_lock.acquire(blocking=False):
         raise RuntimeError("a system update is already running")
 
@@ -292,7 +332,7 @@ OPS = {
     "boot_info": boot.info,
     "password_set": op_password_set,
     "memory_free": op_memory_free,
-    "system_update_check": sysupdate.check,
+    "system_update_check": op_system_update_check,
     "system_update_apply": op_system_update_apply,
     "memory_saver": op_memory_saver,
 }

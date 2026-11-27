@@ -76,6 +76,8 @@ def _nix_records():
 
 def install_nix(entry, progress):
     """Install a package from the same nixpkgs the system was built from (binary cache, no compiling)."""
+    if not shutil.which("nix"):
+        raise RuntimeError("this app needs the JStarx SD card image (Nix is not on this system)")
     attr = entry["nix"]
     env = dict(os.environ, NIXPKGS_ALLOW_UNFREE="1" if entry.get("unfree") else "0")
     cmd = ["nix", "--extra-experimental-features", "nix-command flakes", "profile", "install", "--impure"]
@@ -84,7 +86,7 @@ def install_nix(entry, progress):
     else:
         cmd += [f"nixpkgs#{attr}"]
     progress(f"Installing {entry['name']} (this can take a few minutes)", None)
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, env=env)
     last = ""
     for line in proc.stdout:
         line = line.strip()
@@ -118,7 +120,7 @@ def uninstall(app_id):
     rec = next((r for r in recs if r.get("id") == app_id), None)
     if rec:
         subprocess.run(["nix", "--extra-experimental-features", "nix-command flakes", "profile", "remove", rec.get("nix", app_id)],
-                       capture_output=True, text=True)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         atomic_write_json(NIX_APPS_FILE, [r for r in recs if r.get("id") != app_id])
         return {"ok": True}
     raise ValueError("that app is not installed")

@@ -1,0 +1,3 @@
+# Started by labwc when the JStarx session begins.
+starx-shell-supervisor >/dev/null 2>&1 &
+starx-cast >/dev/null 2>&1 &

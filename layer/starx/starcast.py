@@ -17,6 +17,7 @@ import os
 import shutil
 import signal
 import socket
+import socketserver
 import subprocess
 import tempfile
 import threading
@@ -97,7 +98,7 @@ class Streamer:
         r.stdout.close()
         self.procs = [r, f]
         handler = functools.partial(_QuietHandler, directory=self.dir)
-        self.httpd = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), handler)
+        self.httpd = _ThreadingHTTPServer(("0.0.0.0", PORT), handler)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
         return f"http://{local_ip()}:{PORT}/stream.m3u8"
 
@@ -126,6 +127,11 @@ class Streamer:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
+class _ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    """http.server.ThreadingHTTPServer, which only exists from Python 3.7 (JetPack has 3.6)."""
+    daemon_threads = True
+
+
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -151,7 +157,7 @@ def discover(timeout=8):
 def headless_output():
     """Name of the virtual output the session renders to (if any)."""
     try:
-        r = subprocess.run(["wlr-randr", "--json"], capture_output=True, text=True, timeout=5)
+        r = subprocess.run(["wlr-randr", "--json"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=5)
         for o in json.loads(r.stdout or "[]"):
             if o.get("name", "").startswith("HEADLESS"):
                 return o["name"]

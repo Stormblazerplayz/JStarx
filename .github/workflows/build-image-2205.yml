@@ -1,0 +1,52 @@
+# Builds the JStarx SD card image for the Jetson's built-in NVIDIA 4.9 kernel (NixOS 22.05, see default-22.nix).
+# Runs on pushes to the 22.05 branch that change its files, and when started by hand.
+name: Build JStarx OS image (22.05)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/keen-edison-q2yclm]
+    paths: ["default-22.nix", "os-22/**", ".github/workflows/build-image-2205.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  sd-image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make room on the disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost
+          df -h /
+
+      - name: Let this PC run ARM64 programs (QEMU)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            extra-platforms = aarch64-linux
+
+      - name: Build the SD card image (NixOS 22.05, NVIDIA 4.9 kernel on the board)
+        run: nix-build default-22.nix -A sdImage -o result-sd
+
+      - name: Compress the image
+        run: |
+          mkdir out
+          xz -T0 -6 -c result-sd/sd-image/*.img > out/jstarx-2205-jetson-nano.img.xz
+          (cd out && sha256sum * > SHA256SUMS)
+          ls -lh out
+
+      - name: Save the image
+        uses: actions/upload-artifact@v4
+        with:
+          name: jstarx-sd-image-2205
+          path: out/
+          compression-level: 0

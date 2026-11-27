@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# JStarx desktop session (started by greetd for the user).
+export XDG_CURRENT_DESKTOP=JStarx:wlroots XDG_SESSION_DESKTOP=JStarx XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM="wayland;xcb" ELECTRON_OZONE_PLATFORM_HINT=wayland
+export GTK_THEME="${GTK_THEME:-JStarx}"
+
+# Use the active JStarx layer (resolved once, so an update applies at the next start).
+LAYER="$(readlink -f /var/lib/jstarx/layers/current 2>/dev/null)"
+[ -f "$LAYER/layer.json" ] || LAYER="$(readlink -f /etc/jstarx/factory-layer)"
+export JSTARX_LAYER="$LAYER" STARX_APP_BIN="$LAYER/bin/starx-app" PATH="$LAYER/bin:$PATH"
+
+# No screen plugged in? Run on a virtual screen; StarCast will find a TV for it.
+connected=0
+gpu=0
+for s in /sys/class/drm/card*-*/status; do
+  [ -e "$s" ] && gpu=1
+  [ "$(cat "$s" 2>/dev/null)" = connected ] && connected=1
+done
+if [ "$connected" = 0 ]; then
+  if [ "$gpu" = 1 ]; then
+    export WLR_BACKENDS=drm,headless,libinput   # a screen can still be plugged in later
+  else
+    export WLR_BACKENDS=headless,libinput WLR_RENDERER=pixman
+  fi
+  export WLR_HEADLESS_OUTPUTS=1 STARX_HEADLESS=1
+fi
+
+# Firefox: one profile, with the JStarx top bar that curves around the Dynamic Island.
+export MOZ_LEGACY_PROFILES=1
+FFDIR="$HOME/.mozilla/firefox"
+if [ ! -f "$FFDIR/profiles.ini" ]; then
+  mkdir -p "$FFDIR/jstarx.default"
+  printf '[General]\nStartWithLastProfile=1\nVersion=2\n\n[Profile0]\nName=default\nIsRelative=1\nPath=jstarx.default\nDefault=1\n' > "$FFDIR/profiles.ini"
+fi
+FFPROFILE="$(sed -n 's/^Path=//p' "$FFDIR/profiles.ini" | head -n 1)"
+if [ -n "$FFPROFILE" ]; then
+  case "$FFPROFILE" in /*) ;; *) FFPROFILE="$FFDIR/$FFPROFILE" ;; esac
+  mkdir -p "$FFPROFILE/chrome"
+  # keep a userChrome.css the user made themselves; otherwise follow the active JStarx layer
+  if [ ! -e "$FFPROFILE/chrome/userChrome.css" ] || [ -L "$FFPROFILE/chrome/userChrome.css" ]; then
+    ln -sfn /var/lib/jstarx/layers/current/assets/firefox/userChrome.css "$FFPROFILE/chrome/userChrome.css"
+  fi
+fi
+
+mkdir -p "${XDG_RUNTIME_DIR:-/tmp}/jstarx"
+LOG="${XDG_RUNTIME_DIR:-/tmp}/jstarx/session.log"
+# Try the GPU first; if the compositor can't start, fall back to software rendering.
+for renderer in "${WLR_RENDERER:-auto}" pixman; do
+  start=$(date +%s)
+  if [ "$renderer" = auto ]; then unset WLR_RENDERER; else export WLR_RENDERER="$renderer"; fi
+  labwc >>"$LOG" 2>&1 && exit 0
+  [ $(( $(date +%s) - start )) -gt 20 ] && exit 1
+  echo "$(date) labwc failed with renderer=$renderer, trying the next one" >>"$LOG"
+done
+exit 1

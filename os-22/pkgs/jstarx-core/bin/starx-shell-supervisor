@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Keeps StarShell running. If it crashes 3 times in a row, ask the system to repair JStarx
+# (undo the last update, or go back to the factory version), then try again. Last resort: Safe Mode.
+RUN="${XDG_RUNTIME_DIR:-/tmp}/jstarx"; mkdir -p "$RUN"
+LOG="$RUN/supervisor.log"
+FACTORY="$(readlink -f /etc/jstarx/factory-layer)"
+fails=0
+# The desktop session ended (the compositor is gone): nothing to keep running.
+# The compositor's socket (Wayland, the SD card image), or else the X server's socket (JetPack)
+compositor_alive() {
+  [ -S "${XDG_RUNTIME_DIR:-/tmp}/${WAYLAND_DISPLAY:-wayland-0}" ] && return 0
+  d="${DISPLAY:-:0}"; d="${d#:}"; d="${d%%.*}"
+  [ -S "/tmp/.X11-unix/X${d:-0}" ]
+}
+while true; do
+  compositor_alive || exit 0
+  start=$(date +%s)
+  "$JSTARX_LAYER/bin/starx-shell"
+  code=$?
+  [ "$code" -eq 0 ] && exit 0
+  compositor_alive || exit 0   # not a crash of the shell: the whole session is closing
+  dur=$(( $(date +%s) - start ))
+  if [ "$dur" -lt 90 ]; then fails=$((fails + 1)); else fails=1; fi
+  echo "$(date) StarShell stopped (code $code after ${dur}s), failures in a row: $fails" >>"$LOG"
+  if [ "$fails" -ge 3 ]; then
+    PYTHONPATH="$FACTORY" "${STARX_PYTHON:-python3}" -c 'from starx import daemon; print(daemon.starxd("shell_failed", timeout=120))' >>"$LOG" 2>&1
+    NEW="$(readlink -f /var/lib/jstarx/layers/current 2>/dev/null)"
+    if [ -n "$NEW" ] && [ "$NEW" != "$JSTARX_LAYER" ] && [ -f "$NEW/layer.json" ]; then
+      echo "$(date) auto-repair switched to $NEW" >>"$LOG"
+      export JSTARX_LAYER="$NEW"
+    else
+      echo "$(date) starting Safe Mode (factory layer)" >>"$LOG"
+      export JSTARX_LAYER="$FACTORY" STARX_SAFE_MODE=1
+    fi
+    export STARX_APP_BIN="$JSTARX_LAYER/bin/starx-app" PATH="$JSTARX_LAYER/bin:$PATH"
+    fails=0
+  fi
+  sleep 1
+done

@@ -2,6 +2,7 @@
 import json
 import os
 import shlex
+import shutil
 import subprocess
 
 from . import paths
@@ -51,9 +52,16 @@ def lookup_theme_icon(name, size=128):
         return None
 
 
+def _terminal():
+    """foot on the JStarx SD card image (Wayland), xterm on JetPack (X11)."""
+    return "foot" if shutil.which("foot") else "xterm"
+
+
 def _builtin_records():
     out = []
     for aid, name, kind, target, app_id, icon, cat, desc in BUILTIN:
+        if aid == "terminal":
+            target, app_id = [_terminal()], _terminal()
         out.append({
             "id": aid, "name": name, "kind": kind, "app_id": app_id, "icon": _icon_url(icon if ":" in icon else icon),
             "category": cat, "description": desc, "builtin": True,

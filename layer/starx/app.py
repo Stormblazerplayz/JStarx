@@ -11,8 +11,14 @@ import sys
 import gi
 
 gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk  # noqa: E402
+
+try:  # the title bar is drawn with cairo (see _draw_header): GTK must know how to pass cairo contexts
+    gi.require_foreign("cairo")
+except ImportError:
+    pass
 
 from . import apps, paths  # noqa: E402
 from .api import Api, _notify_shell  # noqa: E402
@@ -215,6 +221,7 @@ def main():
         print(f"no JStarx web app called {sys.argv[1]}", file=sys.stderr)
         sys.exit(1)
     GLib.set_prgname(rec["app_id"])
+    Gdk.set_program_class("JStarxApp")  # X11 window class: "<app id>.JStarxApp" (read by wm.py)
     GLib.set_application_name(rec["name"])
     app = Gtk.Application(application_id=rec["app_id"], flags=Gio.ApplicationFlags.FLAGS_NONE)
     state = {}

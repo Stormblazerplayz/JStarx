@@ -1,0 +1,12 @@
+[Unit]
+Description=JStarx swap file on the card (up to 8 GB)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/jstarx/bin/jstarx-swapfile start
+ExecStop=/opt/jstarx/bin/jstarx-swapfile stop
+
+[Install]
+WantedBy=multi-user.target

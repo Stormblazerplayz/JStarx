@@ -56,6 +56,10 @@ The first start takes a bit longer because JStarx grows to fill your whole SD ca
 > **ISO file?** The Jetson Nano starts from an SD card image (`.img`, here `.img.xz`), not an `.iso`.
 > An ISO is for PCs and would not start on a Jetson. Flash the `.img.xz` with balenaEtcher.
 
+## Already running JetPack 4.6.1? Add the JStarx core
+
+If your Jetson Nano already runs NVIDIA's JetPack 4.6.1, you can add the JStarx core services and desktop without flashing anything. See [`jetpack/README.md`](jetpack/README.md). Spark, the Nix-based Star Store apps and wireless display casting need the JStarx SD card image.
+
 ## Spark 1 (the assistant)
 
 Spark 1 is Storm's own model: a Llama-style transformer with 20 layers, 1024 wide, 16 attention
@@ -125,7 +129,8 @@ python3 -m pytest -q tests
 | `layer/` | The JStarx layer (updates itself from GitHub): StarShell, apps, games, Star Store, wallpapers |
 | `logos/` | 10 logo concepts (Nova is the official one) |
 | `tools/` | Scripts that make the logos, icons, wallpapers, boot screen, manifests, and the QEMU test |
-| `tests/` | Tests for the updater, repair, power, StarAI and boot counter |
+| `jetpack/` | Installer for the JStarx core services on JetPack 4.6.1 (the original Jetson Nano) |
+| `tests/` | Tests for the updater, repair, power, StarAI, boot counter and the JetPack install |
 
 ## Keyboard shortcuts
 

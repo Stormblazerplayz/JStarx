@@ -393,7 +393,7 @@ def sample_ids(model, tok, workdir, log=print, limit=384):
         write_gguf(model, tok, {"layout": "neox", "theta": 10000.0}, vocab, log=None, tensors=False)
         with open(text, "w") as f:
             f.write(SAMPLE_TEXT)
-        r = subprocess.run([exe, "-m", vocab, "-f", text, "--ids", "--log-disable"], capture_output=True, text=True, timeout=300)
+        r = subprocess.run([exe, "-m", vocab, "-f", text, "--ids", "--log-disable"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=300)
         line = next((l for l in reversed(r.stdout.splitlines()) if l.startswith("[")), None)
         ids = json.loads(line) if line else None
         if not ids:
@@ -851,7 +851,7 @@ def convert(checkpoint, folder, out_dir=None, quantize=("Q8_0", "Q4_K_M"), log=p
     for qtype in ([quantize] if isinstance(quantize, str) else list(quantize or [])) if exe else []:
         q = os.path.join(out_dir, f"spark-1-{qtype.lower()}.gguf")
         log(f"making the {qtype} copy…")
-        r = subprocess.run([exe, f16, q, qtype], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        r = subprocess.run([exe, f16, q, qtype], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, universal_newlines=True)
         if r.returncode == 0 and os.path.exists(q):
             made.append(q)
         else:
